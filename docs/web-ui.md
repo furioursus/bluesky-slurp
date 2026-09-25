@@ -47,6 +47,9 @@
 
 **TL;DR:** brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, Titillium Web, uppercase headings, no radius or shadow, light and dark themes.
 
+- **Tokens:** every length, size, type step, tracking and leading value is a custom property on `:root` in `web/style.css`. Rules use `var(--…)` or a `calc()` of tokens. The only raw lengths outside `:root` are the `860px` breakpoint (media queries can't read custom properties) and the phone-size token overrides inside it. Inline `style` in `app.js` is reserved for data-driven widths and heights (chart bars).
+- **Scales:** spacing `--space-3xs` to `--space-xl` (2px to 32px), type `--text-2xs` to `--text-lg` plus four fluid display sizes, tracking `--track` / `--track-wide`, and `--control` (2.75rem) as the minimum tap target.
+- **One line, never two:** hairlines come from `gap: var(--line)` over an ink background. A grid nested inside a cell drops its own bottom border (`.cell .grid`), since the outer grid already draws that edge. Nested content that needs lines should be full-bleed cells in the same grid, not a grid floating inside padding. A 2-column grid with an odd number of cells stretches the last one across the row, so the ink background never shows through as a black block.
 - **Wordmark overflow:** the letter-spaced wordmark trails spacing after its last glyph. Without `overflow: hidden` it widened the page on phones and caused horizontal scroll (found in testing).
 - **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference. `body` has bottom padding so the last row can always scroll clear of it, after it was found covering the Proceed button.
 - **Theme before paint:** an inline script in `index.html` applies the saved theme before first paint so night mode doesn't flash white.

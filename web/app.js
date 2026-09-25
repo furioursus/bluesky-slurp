@@ -174,7 +174,7 @@ function postEmbed(uri, p) {
         ext(bskyPostUrl(p.uri), `${when(p.record?.createdAt)} ↗`)),
       p.record?.text && h('p', { class: 'embed-text' }, p.record.text),
       embedMedia(p.embed, blurToggle),
-      labels.length > 0 && h('p', {}, labels.map((l) => h('span', { class: 'tag', style: 'margin:0 6px 0 0' }, l))),
+      labels.length > 0 && h('p', { class: 'tag-row' }, labels.map((l) => h('span', { class: 'tag' }, l))),
       h('p', { class: 'embed-stats muted' }, `${fmt(p.replyCount)} replies · ${fmt(p.repostCount)} reposts · ${fmt(p.quoteCount)} quotes · ${fmt(p.likeCount)} likes`),
     ),
   );
@@ -207,7 +207,7 @@ function embedMedia(e, blurToggle) {
 async function jobPanel(request, onDone) {
   const log = h('pre', { class: 'log', 'aria-live': 'polite' });
   const status = h('span', { class: 'kicker' }, 'starting');
-  const prompt = cell({ class: 'span-all', hidden: true });
+  const prompt = cell({ class: 'span-all flush', hidden: true });
   const panel = grid('cols-1 job', cell({ class: 'stack' }, h('div', { class: 'status-line' }, h('h3', { class: 'subtitle' }, request.mode === 'archive' ? `Archiving ${request.input}` : `Analyzing ${request.input}`), status), log), prompt);
 
   const append = (line) => {
@@ -255,10 +255,9 @@ async function jobPanel(request, onDone) {
         cell({ class: 'stack' }, h('p', { class: 'kicker' }, 'Input tokens (exact)'), h('p', { class: 'big-number' }, fmt(e.inputTokens))),
         cell({ class: 'stack' }, h('p', { class: 'kicker' }, 'Output tokens (range)'), h('p', { class: 'subtitle' }, `${fmt(e.outputLow)} – ${fmt(e.outputHigh)}`)),
         cell({ class: 'stack' }, h('p', { class: 'kicker' }, `${fmt(e.posts)} posts · ${e.requests} requests`), h('p', { class: 'mono' }, e.model)),
-      ),
-      h('div', { class: 'btn-row', style: 'margin-top:20px' },
-        h('button', { class: 'btn solid', type: 'button', onclick: () => answer(true) }, 'Proceed'),
-        h('button', { class: 'btn', type: 'button', onclick: () => answer(false) }, 'Skip tone pass'),
+        cell({ class: 'span-all btn-row' },
+          h('button', { class: 'btn solid', type: 'button', onclick: () => answer(true) }, 'Proceed'),
+          h('button', { class: 'btn', type: 'button', onclick: () => answer(false) }, 'Skip tone pass')),
       ),
     );
     prompt.hidden = false;
@@ -273,7 +272,7 @@ function toneControls(cfg, { withToggle = true } = {}) {
   const limit = h('input', { class: 'input small', name: 'toneLimit', type: 'number', min: 1, max: 2000, value: 200, 'aria-label': 'Posts to label' });
   const el = h('div', { class: 'stack' },
     withToggle && h('label', { class: 'check' }, tone, h('span', {}, h('strong', {}, 'Tone pass'), h('small', {}, 'Claude labels replies and quotes. Shows a cost estimate and asks before spending.'))),
-    h('div', { class: 'grid cols-2', style: 'background:none;gap:12px;border:0' }, h('label', { class: 'field' }, h('span', { class: 'kicker' }, 'Model'), model), h('label', { class: 'field' }, h('span', { class: 'kicker' }, 'Posts to label'), limit)),
+    h('div', { class: 'split' }, h('label', { class: 'field' }, h('span', { class: 'kicker' }, 'Model'), model), h('label', { class: 'field' }, h('span', { class: 'kicker' }, 'Posts to label'), limit)),
     !cfg.hasApiKey && h('p', { class: 'notice' }, 'No ANTHROPIC_API_KEY in the server environment. Put it in .env and restart, or the tone pass will fail.'),
   );
   return { el, tone, model, limit };
@@ -308,7 +307,7 @@ async function homeView() {
       cell({ class: 'stack-lg' }, h('h1', { class: 'display' }, 'Archive', h('br'), 'an account'), h('p', { class: 'muted' }, 'Every public record from every app on the atmosphere: posts, likes, reposts, follows, blocks, lists, and third-party apps too. Each interaction links straight to its source.')),
       cell({ class: 'stack-lg' },
         h('label', { class: 'field' }, h('span', { class: 'kicker' }, 'Handle, DID, or bsky.app profile URL'), input),
-        h('div', { class: 'grid cols-2', style: 'background:none;gap:24px;border:0' },
+        h('div', { class: 'split' },
           h('label', { class: 'check' }, media, h('span', {}, h('strong', {}, 'Media'), h('small', {}, 'Download images and video. Can be gigabytes.'))),
           h('label', { class: 'check' }, analyze, h('span', {}, h('strong', {}, 'Analyze'), h('small', {}, 'Behavior and interests report. Free, offline.'))),
         ),
@@ -336,9 +335,9 @@ function accountGrid(accounts) {
     return h('a', { class: 'cell account-card', href: `#/a/${a.handle}/${s.snapshot}/report` },
       a.avatar ? h('img', { class: 'avatar', src: a.avatar, alt: '', loading: 'lazy' }) : h('div', { class: 'avatar' }),
       h('div', {},
-        h('div', { class: 'break', style: 'font-size:1.3rem;line-height:1.2' }, `@${a.handle}`),
+        h('div', { class: 'break card-handle' }, `@${a.handle}`),
         a.displayName && h('div', { class: 'break' }, a.displayName),
-        h('div', { class: 'muted', style: 'font-size:.85rem' }, `${fmt(s.totalRecords)} records · ${a.snapshots.length} snapshot${a.snapshots.length === 1 ? '' : 's'} · ${day(s.fetchedAt)}`),
+        h('div', { class: 'muted text-xs' }, `${fmt(s.totalRecords)} records · ${a.snapshots.length} snapshot${a.snapshots.length === 1 ? '' : 's'} · ${day(s.fetchedAt)}`),
       ),
     );
   }));
@@ -373,9 +372,9 @@ async function accountView(handle, snapshot, tab = 'report', rest = [], query) {
     cell({ class: 'flush' }, p?.avatar ? h('img', { class: 'avatar lg', src: p.avatar, alt: '' }) : h('div', { class: 'avatar lg' })),
     cell({ class: 'stack' },
       h('p', { class: 'kicker' }, m.handleVerified ? 'Verified handle' : '⚠ Handle does not verify'),
-      h('h1', { class: 'title break', style: 'text-transform:none' }, `@${m.handle ?? m.did}`),
-      p?.displayName && h('p', { class: 'subtitle', style: 'text-transform:none' }, p.displayName),
-      p?.description && h('p', { class: 'muted break', style: 'white-space:pre-wrap' }, p.description),
+      h('h1', { class: 'title break case-normal' }, `@${m.handle ?? m.did}`),
+      p?.displayName && h('p', { class: 'subtitle case-normal' }, p.displayName),
+      p?.description && h('p', { class: 'muted break prewrap' }, p.description),
       h('p', { class: 'mono muted break' }, m.did),
       m.noUnauthenticated && h('p', { class: 'notice solid' }, 'This account asks apps not to show its posts to logged-out viewers.'),
     ),
@@ -430,7 +429,7 @@ function toneStat(t, hasTonePass = !!t, note = null) {
     : warm.total
       ? `vs ${warm.pctBadFaith}% toward people they know · ${cold.total} cold / ${warm.total} warm`
       : `of ${cold.total} cold posts · no warm posts sampled, so no baseline`;
-  return cell({ class: 'stack' }, kicker, h('p', { class: 'big-number' }, big), h('p', { class: 'muted' }, sub), note && h('p', { class: 'muted', style: 'font-size:.8rem' }, 'sample-limited, see Tone below'));
+  return cell({ class: 'stack' }, kicker, h('p', { class: 'big-number' }, big), h('p', { class: 'muted' }, sub), note && h('p', { class: 'muted text-xs' }, 'sample-limited, see Tone below'));
 }
 
 function toneSentence({ cold, warm }) {
@@ -526,7 +525,7 @@ function reportView(handle, snapshot, r, cfg, query) {
       toneStat(W.tone, !!r.toneCoverage, toneNote),
     ),
     grid('cols-1', cell({}, h('p', {}, h('strong', {}, 'Signals, not a verdict. '), 'A high and rising cold share, bursts at one person, and quotes of strangers are the classic bad-faith patterns. Open the linked posts before you conclude anything. Lots of blocks usually means block lists, not aggression.'),
-      s.posts === 0 && h('p', { class: 'notice', style: 'margin-top:12px' }, `No posts in the ${W.label.toLowerCase()} before this snapshot.`))),
+      s.posts === 0 && h('p', { class: 'notice mt-sm' }, `No posts in the ${W.label.toLowerCase()} before this snapshot.`))),
 
     section('Shape', `${W.label}${W.since ? ` (since ${shortDate(W.since)})` : ''} · snapshot ${day(r.account.snapshot)} · first post ${day(r.account.firstPost)}`,
       h('div', { class: 'grid cols-2' },
@@ -534,7 +533,7 @@ function reportView(handle, snapshot, r, cfg, query) {
           h('thead', {}, h('tr', {}, h('th', {}), cols.map((c) => h('th', { class: 'num' }, c.label)))),
           h('tbody', {}, shapeRows.map(([label, get]) => h('tr', {}, h('td', {}, label), cols.map((c) => h('td', { class: 'num' }, get(c)))))))),
         cell({ class: 'stack-lg' },
-          h('div', { class: 'grid cols-2', style: 'background:none;gap:16px;border:0' },
+          h('div', { class: 'split' },
             [['Likes', s.likes], ['Reposts', s.reposts], ['Follows', s.follows], ['Blocks', s.blocks], ['Likes per post', s.likesPerPost], ['Posts per active day', s.postsPerActiveDay]]
               .map(([k, v]) => h('div', {}, h('p', { class: 'kicker' }, k), h('p', { class: 'subtitle' }, fmt(v))))),
           h('div', {}, h('p', { class: 'kicker' }, 'Posts by hour (UTC)'),
@@ -583,15 +582,15 @@ function toneSection(t, section, label, coverage, note) {
   const covers = coverage ? ` The full sample covers ${shortDate(coverage.from)} – ${shortDate(coverage.to)}.` : '';
   return section('Tone', `${label}: ${fmt(t.labelled)} labelled posts, by ${t.model}${t.refused ? `, ${t.refused} without a label` : ''}.${covers} Each label is a model’s reading of one post in context.`,
     h('div', { class: 'grid cols-1' },
-      cell({}, h('p', { class: 'subtitle', style: 'text-transform:none' }, toneSentence(t)),
-        h('p', { class: 'muted', style: 'margin-top:8px' }, 'A big gap between the two is the tell. A high number on both is just how they talk.'),
-        note && h('p', { class: 'notice', style: 'margin-top:12px' }, `${note} Run a bigger tone pass to reach further back.`)),
+      cell({}, h('p', { class: 'subtitle case-normal' }, toneSentence(t)),
+        h('p', { class: 'muted mt-xs' }, 'A big gap between the two is the tell. A high number on both is just how they talk.'),
+        note && h('p', { class: 'notice mt-sm' }, `${note} Run a bigger tone pass to reach further back.`)),
       cell({}, h('table', { class: 'data' },
         h('thead', {}, h('tr', {}, h('th', {}, 'Label'), h('th', { class: 'num' }, `Cold (${t.cold.total})`), h('th', {}, ''), h('th', { class: 'num' }, `Warm (${t.warm.total})`), h('th', {}, ''))),
         h('tbody', {}, LABELS.map((l) => h('tr', {},
           h('td', {}, l, BAD_FAITH.has(l) && h('span', { class: 'tag solid' }, 'bad faith')),
-          h('td', { class: 'num' }, t.cold.counts[l]), h('td', { style: 'width:28%' }, bar(t.cold.counts[l], t.cold.total, false)),
-          h('td', { class: 'num' }, t.warm.counts[l]), h('td', { style: 'width:28%' }, bar(t.warm.counts[l], t.warm.total, true))))))),
+          h('td', { class: 'num' }, t.cold.counts[l]), h('td', { class: 'wide' }, bar(t.cold.counts[l], t.cold.total, false)),
+          h('td', { class: 'num' }, t.warm.counts[l]), h('td', { class: 'wide' }, bar(t.warm.counts[l], t.warm.total, true))))))),
       cell({ class: 'stack-lg' }, LABELS.filter((l) => t.examples[l]?.length).map((l) => h('div', { class: 'stack' },
         h('h3', { class: 'subtitle' }, l),
         h('ol', { class: 'ranked' }, t.examples[l].map((e) => h('li', {}, h('span', { class: 'who' }, ext(e.web, 'post ↗'), ` ${e.reason}`), h('span', { class: 'count muted' }, `${e.confidence}${e.cold ? ' · cold' : ''}`))))))),
@@ -620,22 +619,22 @@ async function recordsView(handle, snapshot, m, collection, query) {
   const page = collection ? await api(`/api/snapshot/${handle}/${snapshot}/records/${collection}?offset=${offset}&limit=${limit}&order=${order}`) : { total: 0, records: [] };
   const link = (o, ord = order) => `${base}/${collection}?offset=${Math.max(0, o)}&order=${ord}`;
   const pager = h('div', { class: 'pager' },
-    h('a', { class: 'btn', href: link(offset - limit), 'aria-disabled': offset === 0 ? 'true' : null, style: offset === 0 ? 'visibility:hidden' : null }, '← Prev'),
+    h('a', { href: link(offset - limit), 'aria-disabled': offset === 0 ? 'true' : null, class: offset === 0 ? 'btn invisible' : 'btn' }, '← Prev'),
     h('span', { class: 'muted' }, `${fmt(offset + 1)}–${fmt(Math.min(offset + limit, page.total))} of ${fmt(page.total)} · `, h('a', { href: link(0, order === 'newest' ? 'oldest' : 'newest') }, order === 'newest' ? 'newest first' : 'oldest first')),
-    h('a', { class: 'btn', href: link(offset + limit), style: offset + limit >= page.total ? 'visibility:hidden' : null }, 'Next →'),
+    h('a', { href: link(offset + limit), class: offset + limit >= page.total ? 'btn invisible' : 'btn' }, 'Next →'),
   );
 
   return grid('cols-side',
     cell({ class: 'flush' }, h('div', { class: 'cell' }, h('h2', { class: 'subtitle' }, 'Collections'), h('p', { class: 'muted' }, `${cols.length} across ${groups.size} apps`)), list),
     cell({ class: 'flush' },
-      h('div', { class: 'cell stack', style: 'border-bottom:1px solid var(--ink)' },
-        h('h2', { class: 'subtitle break', style: 'text-transform:none' }, collection ?? 'No records'),
+      h('div', { class: 'cell stack divided' },
+        h('h2', { class: 'subtitle break case-normal' }, collection ?? 'No records'),
         collection === 'app.bsky.feed.post' && h('label', { class: 'check' },
           h('input', { type: 'checkbox', checked: prefs.showRoots, onchange: (e) => { prefs.showRoots = e.target.checked; route(); } }),
           h('span', {}, h('strong', {}, 'Show thread roots'), h('small', {}, 'Replies always show the post they answer. This adds the post that started the thread.'))),
         pager),
       page.records.map((rec) => recordCard(handle, rec)),
-      page.records.length > 5 && h('div', { class: 'cell', style: 'border-top:1px solid var(--ink)' }, pager.cloneNode(true)),
+      page.records.length > 5 && h('div', { class: 'cell' }, pager.cloneNode(true)),
     ),
   );
 }
@@ -668,7 +667,7 @@ function recordCard(handle, rec) {
 async function identityView(handle, snapshot, m) {
   const id = await api(`/api/snapshot/${handle}/${snapshot}/identity`);
   const services = id.didDocument?.service ?? [];
-  const rows = (pairs) => h('table', { class: 'data' }, h('tbody', {}, pairs.filter(Boolean).map(([k, v]) => h('tr', {}, h('th', { style: 'width:30%' }, k), h('td', { class: 'break' }, v)))));
+  const rows = (pairs) => h('table', { class: 'data' }, h('tbody', {}, pairs.filter(Boolean).map(([k, v]) => h('tr', {}, h('th', { class: 'wide' }, k), h('td', { class: 'break' }, v)))));
   return h('div', {},
     grid('cols-2',
       cell({ class: 'stack' }, h('h2', { class: 'title' }, 'Identity'), rows([
@@ -698,7 +697,7 @@ function aboutView() {
   setNav('about');
   const item = (title, body) => cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, title), h('p', {}, body));
   render(
-    grid('cols-side', cell({}, h('h1', { class: 'display' }, 'About')), cell({ class: 'stack' }, h('p', { class: 'subtitle', style: 'text-transform:none' }, 'Slurp downloads an account’s signed repo from its own PDS. That repo is every public record it has written, in every app on the atmosphere.'))),
+    grid('cols-side', cell({}, h('h1', { class: 'display' }, 'About')), cell({ class: 'stack' }, h('p', { class: 'subtitle case-normal' }, 'Slurp downloads an account’s signed repo from its own PDS. That repo is every public record it has written, in every app on the atmosphere.'))),
     grid('cols-3',
       item('What’s archived', 'The raw repo (repo.car), every record decoded to JSON, the DID document, handle history, and the Bluesky profile view. Media is optional.'),
       item('What isn’t', 'DMs, mutes and private preferences, because they aren’t public. Also what other people did to them, since that lives in other people’s repos.'),
