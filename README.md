@@ -74,14 +74,16 @@ archives/<handle>/
 
 **TL;DR:** structural signals of good- or bad-faith engagement, plus interests. Offline except one batched handle lookup. Read the linked posts before concluding anything.
 
-- **Shape:** original vs self-thread vs reply vs quote, all-time vs last 90 days, likes per post, cadence.
+- **Time windows:** every stat is computed for the last 30 days, 3 months, 6 months, 1 year, and all time, counted back from the snapshot date. The web UI switches between them instantly. `analysis.md` shows all time plus an "Over time" comparison table.
+- **Shape:** original vs self-thread vs reply vs quote, likes per post, cadence.
 - **Cold outreach:** share of replies/quotes aimed at accounts they don't follow, and at accounts they've never liked either. This is the reply-guy and dunk signal.
 - **Fixation:** bursts of 5+ replies to one non-followed account within 24h, with links.
 - **Stranger quotes:** count plus the latest examples.
 - **Interests:** hashtags, link domains, languages, most-liked/most-reposted accounts, which atmosphere apps they use.
 
 Caveats:
-- "Followed" means followed *at snapshot time*. Old replies to people they've since unfollowed count as cold.
+- "Followed" means followed *at snapshot time*, in every window. Old replies to people they've since unfollowed count as cold.
+- Tone labels come from the most recent posts. Windows that reach back past the labelled sample say so, and show the sample's numbers rather than the window's.
 - Many blocks usually means block lists or self-defense, not aggression.
 - Without `--tone`, text isn't read, only structure.
 

@@ -308,7 +308,8 @@ export function summarizeTone(results: Record<string, ToneResult>) {
   const share = (rs: ToneResult[]) => {
     const counts = Object.fromEntries(LABELS.map((l) => [l, rs.filter((r) => r.label === l).length]));
     const badFaith = rs.filter((r) => BAD_FAITH.includes(r.label as Label)).length;
-    return { total: rs.length, counts, pctBadFaith: rs.length ? Math.round((badFaith / rs.length) * 1000) / 10 : 0 };
+    // null, not 0, when nothing was sampled: "no data" must never read as "no bad faith"
+    return { total: rs.length, counts, pctBadFaith: rs.length ? Math.round((badFaith / rs.length) * 1000) / 10 : null };
   };
   const examples = Object.fromEntries(
     LABELS.map((l) => [

@@ -418,7 +418,7 @@ async function accountView(handle, snapshot, tab = 'report', rest = [], query) {
 
   if (tab === 'records') body.replaceChildren(await recordsView(handle, snapshot, m, rest[0], query));
   else if (tab === 'identity') body.replaceChildren(await identityView(handle, snapshot, m));
-  else body.replaceChildren(reportView(handle, snapshot, snap.analysis, cfg));
+  else body.replaceChildren(reportView(handle, snapshot, snap.analysis, cfg, query));
   hydrateHandles(body);
   hydrateEmbeds(body);
 }
@@ -445,10 +445,45 @@ function analysisActions(handle, snapshot, cfg, hasTone) {
   );
 }
 
-/** Only call a change a trend when it moves by 3+ points. */
-const trend = (delta) => (delta >= 3 ? `rising, +${delta.toFixed(1)} pts` : delta <= -3 ? `falling, ${delta.toFixed(1)} pts` : 'about the same as all time');
+/**
+ * Headline tone number: bad-faith share on cold posts, with the warm baseline spelled out underneath.
+ * Keyed on sample sizes, not percentages, so an empty side reads as "not sampled" rather than 0%.
+ */
+function toneStat(t, hasTonePass = !!t, note = null) {
+  const kicker = h('p', { class: 'kicker' }, 'Bad faith, cold');
+  if (!t) return cell({ class: 'stack' }, kicker, h('p', { class: 'big-number' }, '—'), h('p', { class: 'muted' }, hasTonePass ? 'no labelled posts in this window' : 'no tone pass yet'));
+  const { cold, warm } = t;
+  const big = cold.total ? `${cold.pctBadFaith}%` : '—';
+  const sub = !cold.total
+    ? `no cold posts sampled${warm.total ? `; ${warm.pctBadFaith}% of ${warm.total} warm` : ''}`
+    : warm.total
+      ? `vs ${warm.pctBadFaith}% toward people they know · ${cold.total} cold / ${warm.total} warm`
+      : `of ${cold.total} cold posts · no warm posts sampled, so no baseline`;
+  return cell({ class: 'stack' }, kicker, h('p', { class: 'big-number' }, big), h('p', { class: 'muted' }, sub), note && h('p', { class: 'muted', style: 'font-size:.8rem' }, 'sample-limited, see Tone below'));
+}
 
-function reportView(handle, snapshot, r, cfg) {
+/** Same wording as the Markdown report (src/analyze.ts toneSentence). */
+function toneSentence({ cold, warm }) {
+  if (cold.total && warm.total) {
+    const thin = warm.total < 10 || cold.total < 10 ? ` Small sample (${cold.total} cold, ${warm.total} warm), so read the gap loosely.` : '';
+    return `${cold.pctBadFaith}% of cold replies/quotes read as bad faith, vs ${warm.pctBadFaith}% toward people they know.${thin}`;
+  }
+  if (cold.total) return `${cold.pctBadFaith}% of cold replies/quotes read as bad faith. None of the sampled posts were to people they know, so there's no baseline to compare against.`;
+  if (warm.total) return `${warm.pctBadFaith}% of replies to people they know read as bad faith. None of the sampled posts were cold, so there's nothing to compare.`;
+  return 'No replies or quotes were labelled.';
+}
+
+/** "Last 30 days: up 4.3 pts from all time". Only calls it a change at 3+ points. */
+const trend = (label, delta) =>
+  `${label}: ${delta >= 3 ? `up ${delta.toFixed(1)} pts from` : delta <= -3 ? `down ${Math.abs(delta).toFixed(1)} pts from` : 'about the same as'} all time`;
+
+const WINDOW_TABS = { '30d': '30 days', '90d': '3 months', '180d': '6 months', '365d': '1 year', all: 'All time' };
+const shortDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+/** Does this window reach further back than the tone sample? Then its tone numbers are the sample's, not the window's. */
+const toneOutrunsSample = (w, coverage) => coverage && (!w.since || Date.parse(w.since) < Date.parse(coverage.from));
+
+function reportView(handle, snapshot, r, cfg, query) {
   if (!r) {
     const slot = h('div');
     const tone = toneControls(cfg);
@@ -465,9 +500,24 @@ function reportView(handle, snapshot, r, cfg) {
         cell({ class: 'stack-lg' }, tone.el, h('div', { class: 'btn-row' }, run))),
       slot);
   }
-  const s = r.shape;
-  const a = s.allTime;
-  const recent = s.last90Days;
+  if (!r.byWindow) {
+    // report saved before time windows existed: one free re-run upgrades it (tone labels are kept)
+    const slot = h('div');
+    return h('div', {},
+      grid('cols-1', cell({ class: 'empty' },
+        h('h2', { class: 'title' }, 'This report predates time windows'),
+        h('p', { class: 'muted' }, 'Re-run the analysis to drill into 30 days, 3 months, 6 months and 1 year. It’s free, takes about a second, and keeps any tone labels.'),
+        h('button', { class: 'btn solid', type: 'button', onclick: async () => slot.replaceChildren(await jobPanel({ mode: 'analyze', input: handle, snapshot }, () => route())) }, 'Re-run analysis'))),
+      slot);
+  }
+
+  const key = r.windows.includes(query.get('w')) ? query.get('w') : 'all';
+  const W = r.byWindow[key];
+  const ALL = r.byWindow.all;
+  const cmp = key === 'all' ? r.byWindow['90d'] : ALL; // what the headline compares against
+  const s = W.shape;
+  const base = `#/a/${handle}/${snapshot}/report`;
+
   const person = (x, extra) => h('li', {},
     h('span', { class: 'who' }, ext(x.web, x.handle ? `@${x.handle}` : h('span', { 'data-did': x.did }, x.did)), !x.followed && h('span', { class: 'tag' }, 'not followed')),
     h('span', { class: 'count' }, extra ?? fmt(x.count)));
@@ -475,29 +525,48 @@ function reportView(handle, snapshot, r, cfg) {
   const section = (title, sub, ...content) => grid('cols-side', cell({ class: 'stack' }, h('h2', { class: 'title' }, title), sub && h('p', { class: 'muted' }, sub)), cell({ class: 'flush' }, ...content));
   const maxHour = Math.max(1, ...s.postsByHourUTC);
 
+  const cols = key === 'all' ? [ALL] : [W, ALL];
+  const cellOf = (count, share) => (share === undefined ? fmt(count) : `${fmt(count)} (${pct(share)})`);
   const shapeRows = [
-    ['Posts', a.posts, recent.posts],
-    ['Original', a.original, recent.original],
-    ['Self-threads', a.selfThreads, recent.selfThreads],
-    ['Replies to others', `${fmt(a.repliesToOthers)} (${pct(a.pctRepliesToOthers)})`, `${fmt(recent.repliesToOthers)} (${pct(recent.pctRepliesToOthers)})`],
-    ['Quotes', `${fmt(a.quotesOfOthers)} (${pct(a.pctQuotes)})`, `${fmt(recent.quotesOfOthers)} (${pct(recent.pctQuotes)})`],
-    ['Aimed at non-followed', pct(a.pctOutwardToNonFollowed), pct(recent.pctOutwardToNonFollowed)],
-    ['Cold (never liked either)', pct(a.pctOutwardToStrangers), pct(recent.pctOutwardToStrangers)],
+    ['Posts', (x) => fmt(x.shape.posts)],
+    ['Original', (x) => fmt(x.shape.original)],
+    ['Self-threads', (x) => fmt(x.shape.selfThreads)],
+    ['Replies to others', (x) => cellOf(x.shape.repliesToOthers, x.shape.pctRepliesToOthers)],
+    ['Quotes', (x) => cellOf(x.shape.quotesOfOthers, x.shape.pctQuotes)],
+    ['Aimed at non-followed', (x) => pct(x.shape.pctOutwardToNonFollowed)],
+    ['Cold (never liked either)', (x) => pct(x.shape.pctOutwardToStrangers)],
   ];
 
-  return h('div', {},
-    grid('cols-4',
-      cell({ class: 'stack' }, h('p', { class: 'kicker' }, 'Cold outreach, all time'), h('p', { class: 'big-number' }, pct(a.pctOutwardToStrangers)), h('p', { class: 'muted' }, 'of replies + quotes go to strangers')),
-      cell({ class: 'stack' }, h('p', { class: 'kicker' }, 'Cold, last 90 days'), h('p', { class: 'big-number' }, pct(recent.pctOutwardToStrangers)), h('p', { class: 'muted' }, trend(recent.pctOutwardToStrangers - a.pctOutwardToStrangers))),
-      cell({ class: 'stack' }, h('p', { class: 'kicker' }, 'Reply bursts'), h('p', { class: 'big-number' }, fmt(r.targeting.replyBurstsAtNonFollowed.length)), h('p', { class: 'muted' }, '5+ replies at one stranger in 24h')),
-      cell({ class: 'stack' }, h('p', { class: 'kicker' }, 'Tone, cold vs warm'), h('p', { class: 'big-number' }, r.tone ? `${r.tone.cold.pctBadFaith}/${r.tone.warm.pctBadFaith}` : '—'), h('p', { class: 'muted' }, r.tone ? '% bad faith' : 'no tone pass yet')),
-    ),
-    grid('cols-1', cell({}, h('p', {}, h('strong', {}, 'Signals, not a verdict. '), 'A high and rising cold share, bursts at one person, and quotes of strangers are the classic bad-faith patterns. Open the linked posts before you conclude anything. Lots of blocks usually means block lists, not aggression.'))),
+  const coldNow = s.pctOutwardToStrangers;
+  const coldCmp = cmp.shape.pctOutwardToStrangers;
+  // always describe the shorter window relative to all time
+  const recentW = key === 'all' ? cmp : W;
+  const trendText = coldNow == null || coldCmp == null
+    ? 'no replies or quotes to compare'
+    : trend(recentW.label, recentW.shape.pctOutwardToStrangers - ALL.shape.pctOutwardToStrangers);
 
-    section('Shape', `Snapshot ${day(r.account.snapshot)} · first post ${day(r.account.firstPost)}`,
+  const toneNote = toneOutrunsSample(W, r.toneCoverage)
+    ? `Tone labels only cover ${shortDate(r.toneCoverage.from)} – ${shortDate(r.toneCoverage.to)}, so this window’s tone numbers are the sample’s.`
+    : null;
+
+  return h('div', {},
+    grid('cols-1', h('nav', { class: 'cell tabs', 'aria-label': 'Time window' },
+      r.windows.map((k) => h('a', { href: `${base}?w=${k}`, 'aria-current': k === key ? 'page' : null }, WINDOW_TABS[k] ?? k)))),
+
+    grid('cols-4',
+      cell({ class: 'stack' }, h('p', { class: 'kicker' }, `Cold outreach · ${W.label}`), h('p', { class: 'big-number' }, pct(coldNow)), h('p', { class: 'muted' }, 'of replies + quotes go to strangers')),
+      cell({ class: 'stack' }, h('p', { class: 'kicker' }, key === 'all' ? 'Last 3 months' : 'All time'), h('p', { class: 'big-number' }, pct(coldCmp)), h('p', { class: 'muted' }, trendText)),
+      cell({ class: 'stack' }, h('p', { class: 'kicker' }, `Reply bursts · ${W.label}`), h('p', { class: 'big-number' }, fmt(W.targeting.replyBurstsAtNonFollowed.length)), h('p', { class: 'muted' }, '5+ replies at one stranger in 24h')),
+      toneStat(W.tone, !!r.toneCoverage, toneNote),
+    ),
+    grid('cols-1', cell({}, h('p', {}, h('strong', {}, 'Signals, not a verdict. '), 'A high and rising cold share, bursts at one person, and quotes of strangers are the classic bad-faith patterns. Open the linked posts before you conclude anything. Lots of blocks usually means block lists, not aggression.'),
+      s.posts === 0 && h('p', { class: 'notice', style: 'margin-top:12px' }, `No posts in the ${W.label.toLowerCase()} before this snapshot.`))),
+
+    section('Shape', `${W.label}${W.since ? ` (since ${shortDate(W.since)})` : ''} · snapshot ${day(r.account.snapshot)} · first post ${day(r.account.firstPost)}`,
       h('div', { class: 'grid cols-2' },
-        cell({}, h('table', { class: 'data' }, h('thead', {}, h('tr', {}, h('th', {}), h('th', { class: 'num' }, 'All time'), h('th', { class: 'num' }, 'Last 90 days'))),
-          h('tbody', {}, shapeRows.map(([k, x, y]) => h('tr', {}, h('td', {}, k), h('td', { class: 'num' }, typeof x === 'number' ? fmt(x) : x), h('td', { class: 'num' }, typeof y === 'number' ? fmt(y) : y)))))),
+        cell({}, h('table', { class: 'data' },
+          h('thead', {}, h('tr', {}, h('th', {}), cols.map((c) => h('th', { class: 'num' }, c.label)))),
+          h('tbody', {}, shapeRows.map(([label, get]) => h('tr', {}, h('td', {}, label), cols.map((c) => h('td', { class: 'num' }, get(c)))))))),
         cell({ class: 'stack-lg' },
           h('div', { class: 'grid cols-2', style: 'background:none;gap:16px;border:0' },
             [['Likes', s.likes], ['Reposts', s.reposts], ['Follows', s.follows], ['Blocks', s.blocks], ['Likes per post', s.likesPerPost], ['Posts per active day', s.postsPerActiveDay]]
@@ -509,44 +578,48 @@ function reportView(handle, snapshot, r, cfg) {
       ),
     ),
 
-    section('Targeting', 'Who they reply to and quote. “Not followed” is as of this snapshot.',
+    section('Targeting', `${W.label}. “Not followed” is as of this snapshot.`,
       h('div', { class: 'grid cols-2' },
-        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Most replied to'), ranked(r.targeting.mostRepliedTo)),
-        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Most quoted'), ranked(r.targeting.mostQuoted)),
+        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Most replied to'), ranked(W.targeting.mostRepliedTo)),
+        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Most quoted'), ranked(W.targeting.mostQuoted)),
         cell({ class: 'span-all stack' }, h('h3', { class: 'subtitle' }, 'Reply bursts at non-followed accounts'),
-          r.targeting.replyBurstsAtNonFollowed.length
-            ? h('ol', { class: 'ranked' }, r.targeting.replyBurstsAtNonFollowed.map((b) => h('li', {},
+          W.targeting.replyBurstsAtNonFollowed.length
+            ? h('ol', { class: 'ranked' }, W.targeting.replyBurstsAtNonFollowed.map((b) => h('li', {},
                 h('span', { class: 'who' }, ext(b.web, b.handle ? `@${b.handle}` : h('span', { 'data-did': b.did }, b.did)), ` · ${b.day} · `, b.examples.map((u, i) => [ext(u, `[${i + 1}]`), ' '])),
                 h('span', { class: 'count' }, fmt(b.count)))))
             : h('p', { class: 'muted' }, 'None')),
-        cell({ class: 'span-all stack' }, h('h3', { class: 'subtitle' }, `Quotes of strangers: ${fmt(r.targeting.strangerQuotes.count)}`),
-          r.targeting.strangerQuotes.examples.length > 0 && h('p', {}, 'Latest: ', r.targeting.strangerQuotes.examples.map((u, i) => [ext(u, `[${i + 1}]`), ' ']))),
+        cell({ class: 'span-all stack' }, h('h3', { class: 'subtitle' }, `Quotes of strangers: ${fmt(W.targeting.strangerQuotes.count)}`),
+          W.targeting.strangerQuotes.examples.length > 0 && h('p', {}, 'Latest: ', W.targeting.strangerQuotes.examples.map((u, i) => [ext(u, `[${i + 1}]`), ' ']))),
       ),
     ),
 
-    r.tone ? toneSection(r.tone, section) : null,
-    analysisActions(handle, snapshot, cfg, !!r.tone),
+    W.tone
+      ? toneSection(W.tone, section, W.label, r.toneCoverage, toneNote)
+      : r.toneCoverage && section('Tone', W.label, cell({}, h('p', {}, `None of the labelled posts fall in this window. Labels cover ${shortDate(r.toneCoverage.from)} – ${shortDate(r.toneCoverage.to)}.`))),
+    analysisActions(handle, snapshot, cfg, !!r.toneCoverage),
 
-    section('Interests', null,
+    section('Interests', W.label,
       h('div', { class: 'grid cols-2' },
-        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Hashtags'), h('div', { class: 'chips' }, r.interests.hashtags.length ? r.interests.hashtags.map((t) => h('span', { class: 'chip' }, `#${t.tag}`, h('b', {}, t.count))) : h('span', { class: 'muted' }, 'None'))),
-        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Links to'), h('div', { class: 'chips' }, r.interests.linkDomains.map((d) => h('span', { class: 'chip' }, d.domain, h('b', {}, d.count))))),
-        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Most liked'), ranked(r.interests.mostLiked)),
-        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Most reposted'), ranked(r.interests.mostReposted)),
-        cell({ class: 'span-all stack' }, h('h3', { class: 'subtitle' }, 'Apps on the atmosphere'), h('div', { class: 'chips' }, r.interests.appsUsed.map((x) => h('span', { class: 'chip' }, x.app, h('b', {}, fmt(x.records)))))),
-        cell({ class: 'span-all' }, h('p', { class: 'muted' }, 'Languages: ', r.interests.languages.map((l) => `${l.lang} (${fmt(l.count)})`).join(', ') || 'none')),
+        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Hashtags'), h('div', { class: 'chips' }, W.interests.hashtags.length ? W.interests.hashtags.map((t) => h('span', { class: 'chip' }, `#${t.tag}`, h('b', {}, t.count))) : h('span', { class: 'muted' }, 'None'))),
+        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Links to'), h('div', { class: 'chips' }, W.interests.linkDomains.length ? W.interests.linkDomains.map((d) => h('span', { class: 'chip' }, d.domain, h('b', {}, d.count))) : h('span', { class: 'muted' }, 'None'))),
+        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Most liked'), ranked(W.interests.mostLiked)),
+        cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, 'Most reposted'), ranked(W.interests.mostReposted)),
+        cell({ class: 'span-all stack' }, h('h3', { class: 'subtitle' }, 'Apps on the atmosphere'), h('p', { class: 'muted' }, 'All time: record counts don’t carry dates to window by.'), h('div', { class: 'chips' }, r.appsUsed.map((x) => h('span', { class: 'chip' }, x.app, h('b', {}, fmt(x.records)))))),
+        cell({ class: 'span-all' }, h('p', { class: 'muted' }, 'Languages: ', W.interests.languages.map((l) => `${l.lang} (${fmt(l.count)})`).join(', ') || 'none')),
       ),
     ),
   );
 }
 
-function toneSection(t, section) {
+function toneSection(t, section, label, coverage, note) {
   const max = Math.max(1, ...LABELS.map((l) => Math.max(t.cold.counts[l] / (t.cold.total || 1), t.warm.counts[l] / (t.warm.total || 1))));
   const bar = (n, total, hatch) => h('div', { class: `bar ${hatch ? 'hatch' : ''}` }, h('i', { style: `width:${total ? ((n / total) / max) * 100 : 0}%` }));
-  return section('Tone', `${fmt(t.labelled)} posts labelled by ${t.model}${t.refused ? `, ${t.refused} without a label` : ''}. Each label is a model’s reading of one post in context.`,
+  const covers = coverage ? ` The full sample covers ${shortDate(coverage.from)} – ${shortDate(coverage.to)}.` : '';
+  return section('Tone', `${label}: ${fmt(t.labelled)} labelled posts, by ${t.model}${t.refused ? `, ${t.refused} without a label` : ''}.${covers} Each label is a model’s reading of one post in context.`,
     h('div', { class: 'grid cols-1' },
-      cell({}, h('p', { class: 'subtitle', style: 'text-transform:none' }, `${t.cold.pctBadFaith}% of cold replies/quotes read as bad faith, vs ${t.warm.pctBadFaith}% toward people they know.`),
-        h('p', { class: 'muted', style: 'margin-top:8px' }, 'A big gap between the two is the tell. A high number on both is just how they talk.')),
+      cell({}, h('p', { class: 'subtitle', style: 'text-transform:none' }, toneSentence(t)),
+        h('p', { class: 'muted', style: 'margin-top:8px' }, 'A big gap between the two is the tell. A high number on both is just how they talk.'),
+        note && h('p', { class: 'notice', style: 'margin-top:12px' }, `${note} Run a bigger tone pass to reach further back.`)),
       cell({}, h('table', { class: 'data' },
         h('thead', {}, h('tr', {}, h('th', {}, 'Label'), h('th', { class: 'num' }, `Cold (${t.cold.total})`), h('th', {}, ''), h('th', { class: 'num' }, `Warm (${t.warm.total})`), h('th', {}, ''))),
         h('tbody', {}, LABELS.map((l) => h('tr', {},
@@ -708,8 +781,18 @@ toggle.addEventListener('click', () => {
 });
 syncToggle();
 
+/** The hash minus the time-window param: switching windows keeps your scroll position, anything else starts at the top. */
+const placeKey = () => {
+  const [path, qs] = location.hash.split('?');
+  const q = new URLSearchParams(qs ?? '');
+  q.delete('w');
+  return `${path}?${q}`;
+};
+let lastPlace = placeKey();
 window.addEventListener('hashchange', () => {
+  const place = placeKey();
   route();
-  window.scrollTo(0, 0);
+  if (place !== lastPlace) window.scrollTo(0, 0);
+  lastPlace = place;
 });
 route();
