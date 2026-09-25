@@ -19,7 +19,7 @@ const TYPES: Record<string, string> = {
   '.pdf': 'application/pdf',
 };
 
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, url }) => {
   const { handle = '', file = '' } = params;
   if (!SAFE_NAME.test(handle) || !SAFE_NAME.test(file)) return new Response('bad path', { status: 400 });
   const path = join(ARCHIVE_ROOT, handle, 'blobs', file);
@@ -27,7 +27,11 @@ export const GET: APIRoute = async ({ params }) => {
     const s = await stat(path);
     if (!s.isFile()) throw new Error();
     return new Response(Readable.toWeb(createReadStream(path)) as ReadableStream, {
-      headers: { 'content-type': TYPES[extname(path)] ?? 'application/octet-stream', 'content-length': String(s.size) },
+      headers: {
+        'content-type': TYPES[extname(path)] ?? 'application/octet-stream',
+        'content-length': String(s.size),
+        ...(url.searchParams.has('download') ? { 'content-disposition': `attachment; filename="${file}"` } : {}),
+      },
     });
   } catch {
     return new Response('not found', { status: 404 });

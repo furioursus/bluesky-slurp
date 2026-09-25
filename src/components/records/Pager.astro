@@ -7,14 +7,15 @@ interface Props {
   limit: number;
   total: number;
   order: 'newest' | 'oldest';
+  keepScroll?: boolean;
 }
 
-const { href, offset, limit, total, order } = Astro.props;
+const { href, offset, limit, total, order, keepScroll = false } = Astro.props;
 const first = offset === 0;
 const last = offset + limit >= total;
 ---
 
-<div class="pager">
+<div class="pager" data-keep-scroll={keepScroll || undefined}>
   <a class:list={['btn', { invisible: first }]} href={href(Math.max(0, offset - limit))} aria-disabled={first ? 'true' : undefined}>← Prev</a>
   <span class="muted">
     {fmt(total ? offset + 1 : 0)}–{fmt(Math.min(offset + limit, total))} of {fmt(total)} ·

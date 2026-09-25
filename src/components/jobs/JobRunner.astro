@@ -1,6 +1,6 @@
 ---
 interface Props {
-  mode: 'archive' | 'analyze';
+  mode: 'archive' | 'analyze' | 'media';
   input?: string;
   snapshot?: string;
   after: 'open' | 'reload';
@@ -49,6 +49,7 @@ const { mode, input, snapshot, after } = Astro.props;
   type JobEvent = { type: 'log' | 'estimate' | 'done' | 'error'; data: any };
 
   const AUTO_RELOAD_MS = 600;
+  const TITLES: Record<string, string> = { archive: 'Archiving', analyze: 'Analyzing', media: 'Downloading media for' };
 
   const refresh = () => {
     keepScrollOnNextSwap();
@@ -86,7 +87,7 @@ const { mode, input, snapshot, after } = Astro.props;
 
       const panel = (this.querySelector('template')!.content.firstElementChild as HTMLElement).cloneNode(true) as HTMLElement;
       const $ = <T extends HTMLElement>(sel: string) => panel.querySelector<T>(sel)!;
-      $('[data-title]').textContent = `${mode === 'archive' ? 'Archiving' : 'Analyzing'} ${request.input}`;
+      $('[data-title]').textContent = `${TITLES[mode ?? 'analyze'] ?? 'Running'} ${request.input}`;
       this.querySelector('[data-panel-slot]')!.replaceChildren(panel);
       panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 

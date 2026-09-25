@@ -24,6 +24,7 @@ npm run slurp -- furioursus.dev --media           # + images/video (can be GBs; 
 npm run slurp -- furioursus.dev --analyze         # archive, then write the report
 npm run slurp -- analyze furioursus.dev           # report on the latest existing snapshot
 npm run slurp -- analyze furioursus.dev --tone    # + Claude tone pass (estimate, then asks)
+npm run slurp -- media furioursus.dev             # download media for the latest snapshot, later
 ```
 
 Input can be a handle, `@handle`, a DID (`did:plc:…` / `did:web:…`), an `at://` URI, or a `bsky.app/profile/…` URL. `--out <dir>` changes the archive root (default `./archives`).
@@ -40,7 +41,7 @@ Input can be a handle, `@handle`, a DID (`did:plc:…` / `did:web:…`), an `at:
 | `npm run check` | `astro check`: types for `.astro` and `src/lib` |
 
 - **Local only:** it binds to `127.0.0.1` and rejects cross-origin POSTs, because it writes to disk and can spend Claude credits. Your API key stays server-side in `.env`.
-- **Screens:** New archive (form, then a live log), Accounts, and per account: Report / Records / Identity. Pages are real URLs, e.g. `/a/<handle>/<snapshot>/report?w=30d`.
+- **Screens:** New archive (form, then a live log), Accounts, and per account: Report / Records / Media / Identity. Pages are real URLs, e.g. `/a/<handle>/<snapshot>/report?w=30d`. Navigation swaps pages in place (Astro `ClientRouter`).
 - **Archive location:** `SLURP_ARCHIVES=/path npm run dev` points the UI at another archive root (default `./archives`).
 
 ### Component inspector (astro-pathfinder)

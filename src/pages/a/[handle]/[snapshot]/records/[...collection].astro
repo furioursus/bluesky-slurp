@@ -8,6 +8,7 @@ import Grid from '../../../../../components/ui/Grid.astro';
 import AccountLayout from '../../../../../layouts/AccountLayout.astro';
 import { getHandles, getPosts } from '../../../../../lib/appview.ts';
 import { loadSnapshot, readRecords } from '../../../../../lib/archives.ts';
+import { localBlobFiles } from '../../../../../lib/media.ts';
 import { didOf, embedTargets, ROOTS_COOKIE } from '../../../../../lib/ui.ts';
 
 const PAGE = 50;
@@ -27,9 +28,10 @@ const base = `/a/${handle}/${snapshot}/records`;
 const page = snap && collection && !unknown ? await readRecords(snap.dir, collection, offset, PAGE, order) : null;
 const records = page?.records ?? [];
 const pointers = records.flatMap((rec) => rec.refs.filter((x) => x.kind !== 'blob'));
-const [posts, handles] = await Promise.all([
+const [posts, handles, localFiles] = await Promise.all([
   getPosts(records.flatMap((rec) => embedTargets(rec.refs.filter((x) => x.kind !== 'blob'), showRoots).map((x) => x.target))),
   getHandles(pointers.filter((x) => x.kind === 'record' || x.kind === 'account').map((x) => didOf(x.target))),
+  snap ? localBlobFiles(snap.dir) : Promise.resolve(new Set<string>()),
 ]);
 const href = (o: number, ord: 'newest' | 'oldest' = order) => `${base}/${collection}?offset=${o}&order=${ord}`;
 ---
@@ -44,7 +46,7 @@ const href = (o: number, ord: 'newest' | 'oldest' = order) => `${base}/${collect
         {collection === POSTS && <RootsToggle checked={showRoots} />}
         {page && <Pager href={href} offset={offset} limit={PAGE} total={page.total} order={order} />}
       </Cell>
-      {records.map((rec) => <RecordCard handle={handle} rec={rec} posts={posts} handles={handles} showRoots={showRoots} />)}
+      {records.map((rec) => <RecordCard handle={handle} rec={rec} posts={posts} handles={handles} showRoots={showRoots} localFiles={localFiles} />)}
       {page && records.length > 5 && <Cell><Pager href={href} offset={offset} limit={PAGE} total={page.total} order={order} /></Cell>}
     </Cell>
   </Grid>

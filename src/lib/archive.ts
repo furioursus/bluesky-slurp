@@ -95,27 +95,9 @@ export async function archiveAccount(input: string, opts: ArchiveOptions, log: (
   const totalRecords = Object.values(counts).reduce((a, b) => a + b, 0);
   log(`  ${totalRecords} records across ${Object.keys(counts).length} collections, ${blobs.size} media blobs referenced`);
 
-  const media = { enabled: opts.media, referenced: blobs.size, downloaded: 0, alreadyHad: 0, failed: [] as { cid: string; error: string }[] };
-  if (opts.media && blobs.size) {
-    await mkdir(blobDir, { recursive: true });
-    log('downloading media…');
-    let done = 0;
-    await pool([...blobs], 4, async ([cid, mimeType]) => {
-      const dest = join(blobDir, blobFileName(cid, mimeType));
-      try {
-        if (existsSync(dest)) media.alreadyHad++;
-        else {
-          const res = await get(blobUrl(cid));
-          await writeFile(`${dest}.part`, new Uint8Array(await res.arrayBuffer()));
-          await rename(`${dest}.part`, dest);
-          media.downloaded++;
-        }
-      } catch (err) {
-        media.failed.push({ cid, error: String((err as Error).message ?? err) });
-      }
-      if (++done % 25 === 0 || done === blobs.size) log(`  ${done}/${blobs.size}`);
-    });
-  }
+  const media = opts.media && blobs.size
+    ? { enabled: true, referenced: blobs.size, ...(await downloadBlobs(blobs, blobUrl, blobDir, log)) }
+    : { enabled: false, referenced: blobs.size, downloaded: 0, alreadyHad: 0, failed: [] as MediaFailure[] };
 
   const noUnauthenticated =
     selfLabels.has('!no-unauthenticated') || profile?.labels?.some((l: any) => l.val === '!no-unauthenticated') === true;
@@ -148,11 +130,45 @@ export async function archiveAccount(input: string, opts: ArchiveOptions, log: (
   return { snapDir, manifest };
 }
 
-function blobFileName(cid: string, mimeType?: string): string {
+export function blobFileName(cid: string, mimeType?: string | null): string {
   return `${cid}.${(mimeType && MIME_EXT[mimeType]) ?? 'bin'}`;
 }
 
-async function writeJson(path: string, data: unknown) {
+export type MediaFailure = { cid: string; error: string };
+
+const DOWNLOAD_CONCURRENCY = 4;
+const PROGRESS_EVERY = 25;
+
+export async function downloadBlobs(
+  blobs: Map<string, string | null | undefined>,
+  blobUrl: (cid: string) => string,
+  blobDir: string,
+  log: (msg: string) => void,
+) {
+  const stats = { downloaded: 0, alreadyHad: 0, failed: [] as MediaFailure[] };
+  if (!blobs.size) return stats;
+  await mkdir(blobDir, { recursive: true });
+  log(`downloading media (${blobs.size} files)…`);
+  let done = 0;
+  await pool([...blobs], DOWNLOAD_CONCURRENCY, async ([cid, mimeType]) => {
+    const dest = join(blobDir, blobFileName(cid, mimeType));
+    try {
+      if (existsSync(dest)) stats.alreadyHad++;
+      else {
+        const res = await get(blobUrl(cid));
+        await writeFile(`${dest}.part`, new Uint8Array(await res.arrayBuffer()));
+        await rename(`${dest}.part`, dest);
+        stats.downloaded++;
+      }
+    } catch (err) {
+      stats.failed.push({ cid, error: String((err as Error).message ?? err) });
+    }
+    if (++done % PROGRESS_EVERY === 0 || done === blobs.size) log(`  ${done}/${blobs.size}`);
+  });
+  return stats;
+}
+
+export async function writeJson(path: string, data: unknown) {
   await writeFile(path, `${JSON.stringify(data, null, 2)}\n`);
 }
 

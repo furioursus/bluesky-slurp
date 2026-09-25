@@ -1,0 +1,8 @@
+<script>
+  document.addEventListener('click', (e) => {
+    const hit = (e.target as HTMLElement).closest('.blurred');
+    if (!hit) return;
+    e.preventDefault();
+    hit.classList.remove('blurred');
+  });
+</script>

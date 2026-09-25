@@ -2,12 +2,14 @@
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { archiveAccount } from './archive.ts';
-import { DEFAULT_MODEL, runAnalyze } from './analyze.ts';
+import { DEFAULT_MODEL, resolveSnapshot, runAnalyze } from './analyze.ts';
+import { downloadSnapshotMedia } from './media.ts';
 
 const HELP = `slurp — archive everything an atproto account has publicly put on the network
 
 usage: slurp <handle | did | bsky.app profile URL> [options]
        slurp analyze <handle | snapshot dir> [--tone] [--out <dir>]
+       slurp media <handle | snapshot dir> [--out <dir>]   download media for an existing snapshot
 
 options:
   --media        also download images, video and other blobs (off by default)
@@ -41,6 +43,12 @@ async function main() {
   if (positionals[0] === 'analyze' && positionals.length === 2) {
     const snap = await runAnalyze(positionals[1], values.out!, tone, log);
     log(`analysis → ${join(snap, 'analysis.md')}`);
+    return;
+  }
+  if (positionals[0] === 'media' && positionals.length === 2) {
+    const snap = await resolveSnapshot(positionals[1], values.out!);
+    await downloadSnapshotMedia(snap, log);
+    log(`done → ${snap}`);
     return;
   }
   if (values.help || positionals.length !== 1) {

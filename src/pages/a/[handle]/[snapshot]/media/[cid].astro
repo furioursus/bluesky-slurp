@@ -1,0 +1,139 @@
+---
+import MediaViewer from '../../../../../components/media/MediaViewer.astro';
+import Cell from '../../../../../components/ui/Cell.astro';
+import EmptyState from '../../../../../components/ui/EmptyState.astro';
+import Ext from '../../../../../components/ui/Ext.astro';
+import Grid from '../../../../../components/ui/Grid.astro';
+import Section from '../../../../../components/ui/Section.astro';
+import AccountLayout from '../../../../../layouts/AccountLayout.astro';
+import { loadSnapshot } from '../../../../../lib/archives.ts';
+import { fmt, plural, when } from '../../../../../lib/format.ts';
+import { loadMediaIndex, localBlobBytes, localBlobFiles } from '../../../../../lib/media.ts';
+import { filterMedia, isSensitive, mediaSearch, onDisk, pageStart, PER_PAGE_COOKIE, readMediaQuery, sourceLabel } from '../../../../../lib/media-view.ts';
+import { SENSITIVE } from '../../../../../lib/ui.ts';
+
+const KB = 1024;
+const MB = KB * 1024;
+const { handle = '', snapshot = '', cid = '' } = Astro.params;
+const snap = await loadSnapshot(handle, snapshot);
+const all = snap ? await loadMediaIndex(snap.dir) : [];
+const files = snap ? await localBlobFiles(snap.dir) : new Set<string>();
+const query = readMediaQuery(Astro.url, Astro.cookies.get(PER_PAGE_COOKIE)?.value);
+const shown = filterMedia(onDisk(all, files), query);
+const index = shown.findIndex((i) => i.cid === cid);
+const item = index >= 0 ? shown[index] : onDisk(all, files).find((i) => i.cid === cid);
+if (snap && !item) Astro.response.status = 404;
+const size = item && snap ? await localBlobBytes(snap.dir, [item.file]) : 0;
+const base = `/a/${handle}/${snapshot}/media`;
+const search = mediaSearch(query, { offset: 0 });
+const prev = index > 0 ? `${base}/${shown[index - 1].cid}${search}` : null;
+const next = index >= 0 && index < shown.length - 1 ? `${base}/${shown[index + 1].cid}${search}` : null;
+const back = `${base}${mediaSearch(query, { offset: index >= 0 ? pageStart(index, query.per) : 0 })}`;
+const src = item ? `/blobs/${handle}/${item.file}` : '';
+const human = (n: number) => (n >= MB ? `${(n / MB).toFixed(1)} MB` : `${Math.max(1, Math.round(n / KB))} KB`);
+const alts = item ? [...new Set(item.uses.map((u) => u.alt).filter(Boolean))] : [];
+---
+
+<AccountLayout snap={snap} tab="media">
+  {
+    item ? (
+      <>
+        <Grid class="viewer-grid">
+          <Cell flush><MediaViewer src={src} item={item} sensitive={isSensitive(item, SENSITIVE)} /></Cell>
+          <Cell stack="lg">
+            <nav class="btn-row" data-media-nav data-prev={prev ?? undefined} data-next={next ?? undefined} data-back={back} aria-label="Media navigation">
+              <a class="btn" href={back} data-back-link>← All media</a>
+              <a class:list={['btn', { invisible: !prev }]} href={prev ?? back} data-step aria-disabled={prev ? undefined : 'true'}>Prev</a>
+              <a class:list={['btn', { invisible: !next }]} href={next ?? back} data-step aria-disabled={next ? undefined : 'true'}>Next</a>
+            </nav>
+            {index >= 0 && <p class="muted">{fmt(index + 1)} of {fmt(shown.length)} · ← → to step, Esc to go back</p>}
+            <table class="data">
+              <tbody>
+                <tr><th class="wide">Type</th><td>{item.mimeType ?? 'unknown'}</td></tr>
+                <tr><th class="wide">Size</th><td>{human(size)}</td></tr>
+                <tr><th class="wide">Latest use</th><td>{when(item.at)}</td></tr>
+                <tr><th class="wide">Used by</th><td>{plural(item.uses.length, 'record')}</td></tr>
+                <tr><th class="wide">CID</th><td class="break"><span class="mono">{item.cid}</span></td></tr>
+              </tbody>
+            </table>
+            {alts.length > 0 && (
+              <div class="stack">
+                <p class="kicker">Alt text</p>
+                {alts.map((a) => <p class="prewrap">{a}</p>)}
+              </div>
+            )}
+            <div class="btn-row">
+              <a class="btn solid" href={`${src}?download`} download={item.file} data-astro-reload>Download</a>
+              <Ext href={src} class="btn">Open original ↗</Ext>
+            </div>
+          </Cell>
+        </Grid>
+        <Section title="Used in" sub={plural(item.uses.length, 'record')}>
+          <Cell>
+            <ol class="ranked">
+              {item.uses.map((u) => (
+                <li>
+                  <span class="who">
+                    <span class="mono muted">{sourceLabel(u.collection)}</span>
+                    {u.text && <span class="use-text">{u.text}</span>}
+                  </span>
+                  <span class="count">{when(u.createdAt)} · <Ext href={u.web}>Open ↗</Ext></span>
+                </li>
+              ))}
+            </ol>
+          </Cell>
+        </Section>
+      </>
+    ) : (
+      <EmptyState title="Not on disk" body="This file isn’t downloaded, or this snapshot doesn’t reference it.">
+        <a class="btn solid" href={base}>All media</a>
+      </EmptyState>
+    )
+  }
+</AccountLayout>
+
+<script>
+  import { navigate } from 'astro:transitions/client';
+  import { keepScrollOnNextSwap } from '../../../../../lib/scroll.ts';
+
+  const WALL_KEY = 'slurp-media-wall';
+  const nav = () => document.querySelector<HTMLElement>('[data-media-nav]');
+  const goBack = () => {
+    const back = nav()?.dataset.back;
+    if (!back) return;
+    if (sessionStorage.getItem(WALL_KEY)?.split('?')[0] === back.split('?')[0]) history.back();
+    else navigate(back);
+  };
+
+  const step = (href: string) => {
+    keepScrollOnNextSwap();
+    navigate(href, { history: 'replace' });
+  };
+
+  document.addEventListener('click', (e) => {
+    const link = (e.target as HTMLElement).closest<HTMLAnchorElement>('[data-media-nav] a');
+    if (!link || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    if (link.hasAttribute('data-back-link')) goBack();
+    else if (!link.classList.contains('invisible')) step(link.href);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    const el = nav();
+    const typing = e.target instanceof Element && e.target.closest('input, select, textarea');
+    if (!el || e.metaKey || e.ctrlKey || e.altKey || typing) return;
+    if (e.key === 'ArrowLeft' && el.dataset.prev) step(el.dataset.prev);
+    else if (e.key === 'ArrowRight' && el.dataset.next) step(el.dataset.next);
+    else if (e.key === 'Escape') goBack();
+    else return;
+    e.preventDefault();
+  });
+</script>
+
+<style>
+  .viewer-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+  .use-text { display: block; margin-top: var(--space-2xs); white-space: pre-wrap; overflow-wrap: anywhere; }
+  @media (--narrow) {
+    .viewer-grid { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>

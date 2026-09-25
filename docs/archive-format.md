@@ -18,11 +18,21 @@ archives/<handle>/
     bsky-profile.json
     analysis.json / analysis.md
     tone.json
+    media-index.json
 ```
 
 - The directory is named by handle, with a `did_plc_…` fallback when there's no handle. Handles change, so `manifest.json` holds the DID and the full handle history.
 - The snapshot timestamp swaps `:` for `-` so it's safe as a directory name.
 - `blobs/` is keyed by CID, which is content-addressed. A file that already exists is never downloaded again.
+
+## Media
+
+**TL;DR:** downloaded files live once per account in `blobs/<cid>.<ext>` and are shared by every snapshot. `media-index.json` in a snapshot lists every file that snapshot references and the records that use it.
+
+- Files are written as `<cid>.part`, then renamed, so an interrupted download never leaves a truncated file under its real name.
+- The extension comes from the MIME type (`jpg`, `png`, `webp`, `gif`, `heic`, `avif`, `mp4`, `mov`, `webm`, `mp3`, `pdf`), otherwise `bin`.
+- `media-index.json` is `{ version, items[] }` with each item `{ cid, mimeType, kind, file, at, uses[] }`, newest first. It's derived data: delete it and the UI rebuilds it.
+- `manifest.media` records `{ enabled, referenced, downloaded, alreadyHad, failed[] }` from the last media download, whether at archive time or later.
 
 ## Record JSON
 

@@ -204,6 +204,10 @@ table.data .wide { width: var(--col-wide); }
 .thumbs img, .thumbs video { height: var(--thumb); min-width: var(--thumb-min); max-width: 100%; object-fit: cover; filter: grayscale(1); border: var(--line) solid var(--ink); background: var(--faint); }
 .thumbs img:hover, .thumbs video:hover { filter: none; }
 
+.blurred { position: relative; overflow: hidden; display: inline-block; cursor: pointer; }
+.blurred img, .blurred video { filter: blur(var(--blur)) grayscale(1); min-width: var(--thumb-wide); }
+.blurred::after { content: 'Sensitive · click to show'; position: absolute; inset: auto var(--space-xs) var(--space-xs); background: var(--ink); color: var(--paper); font-size: var(--text-2xs); padding: var(--space-3xs) var(--space-xs); text-align: center; }
+
 .empty { min-height: var(--empty); display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: var(--space-lg); }
 .notice { border: var(--line) solid var(--ink); padding: var(--space-sm) var(--space-md); }
 .notice.solid { background: var(--ink); color: var(--paper); }

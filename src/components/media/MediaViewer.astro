@@ -1,0 +1,26 @@
+---
+import type { MediaItem } from '../../lib/media.ts';
+import SensitiveReveal from '../ui/SensitiveReveal.astro';
+
+interface Props {
+  src: string;
+  item: MediaItem;
+  sensitive: boolean;
+}
+
+const { src, item, sensitive } = Astro.props;
+---
+
+<div class:list={['viewer', { blurred: sensitive }]}>
+  {item.kind === 'image' && <img src={src} alt={item.uses.find((u) => u.alt)?.alt ?? ''} />}
+  {item.kind === 'video' && <video src={src} controls playsinline preload="metadata" />}
+  {item.kind === 'other' && <p class="mono muted">{item.mimeType ?? 'file'} · no preview</p>}
+</div>
+
+<SensitiveReveal />
+
+<style>
+  .viewer { display: grid; place-items: center; min-height: var(--panel-sm); height: 100%; background: var(--faint); }
+  img, video { display: block; max-width: 100%; max-height: var(--panel); object-fit: contain; }
+  .viewer.blurred { display: grid; width: 100%; }
+</style>

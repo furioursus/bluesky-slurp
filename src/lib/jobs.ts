@@ -2,6 +2,7 @@ import { sep } from 'node:path';
 import { archiveAccount } from './archive.ts';
 import { DEFAULT_MODEL, runAnalyze } from './analyze.ts';
 import { ARCHIVE_ROOT, snapshotDir } from './archives.ts';
+import { downloadSnapshotMedia } from './media.ts';
 import type { ToneEstimate } from './tone.ts';
 
 export type JobEvent = { type: 'log' | 'estimate' | 'done' | 'error'; data: unknown };
@@ -16,7 +17,7 @@ export interface Job {
 }
 
 export interface JobRequest {
-  mode: 'archive' | 'analyze';
+  mode: 'archive' | 'analyze' | 'media';
   input: string;
   snapshot?: string;
   media?: boolean;
@@ -66,13 +67,18 @@ export function startJob(req: JobRequest): Job {
         log('analyzing…');
         await runAnalyze(snapDir, ARCHIVE_ROOT, tone, log);
       }
+    } else if (req.mode === 'media') {
+      const target = req.snapshot ? snapshotDir(req.input, req.snapshot) : null;
+      if (!target) throw new Error('no such snapshot');
+      await downloadSnapshotMedia(target, log);
+      snapDir = target;
     } else {
       const target = req.snapshot ? snapshotDir(req.input, req.snapshot) : req.input.replace(/^@/, '');
       if (!target) throw new Error('no such snapshot');
       log('analyzing…');
       snapDir = await runAnalyze(target, ARCHIVE_ROOT, tone, log);
     }
-    log(req.mode === 'archive' && !req.analyze && !req.tone ? '✓ archived' : '✓ report updated');
+    log(req.mode === 'media' ? '✓ media downloaded' : req.mode === 'archive' && !req.analyze && !req.tone ? '✓ archived' : '✓ report updated');
     const parts = snapDir.split(sep);
     emit(job, 'done', { handle: parts.at(-3), snapshot: parts.at(-1) });
   })().catch((err) => emit(job, 'error', String(err?.message ?? err)));

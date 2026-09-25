@@ -14,9 +14,10 @@ interface Props {
   posts: Map<string, PostView | null | undefined>;
   handles: Map<string, string | null | undefined>;
   showRoots: boolean;
+  localFiles: Set<string>;
 }
 
-const { handle, rec, posts, handles, showRoots } = Astro.props;
+const { handle, rec, posts, handles, showRoots, localFiles } = Astro.props;
 const r = rec.record;
 const text = [r.text, r.description, r.displayName].find((v) => typeof v === 'string') ?? null;
 const media = rec.refs.filter((x) => x.kind === 'blob');
@@ -31,7 +32,7 @@ const pointers = rec.refs.filter((x) => x.kind !== 'blob');
   {text && <p class="text">{text}</p>}
   {pointers.length > 0 && <RefList refs={pointers} handles={handles} />}
   {embedTargets(pointers, showRoots).map((x) => <PostEmbed kicker={EMBED_KICKER[x.role]} uri={x.target} post={posts.get(x.target)} />)}
-  {media.length > 0 && <MediaThumbs handle={handle} media={media} images={r.embed?.images} />}
+  {media.length > 0 && <MediaThumbs handle={handle} media={media} images={r.embed?.images} localFiles={localFiles} />}
   <details class="raw">
     <summary>Record JSON</summary>
     <pre>{JSON.stringify(rec, null, 2)}</pre>

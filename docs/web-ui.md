@@ -8,7 +8,7 @@
 
 ```
 src/
-  lib/            engine (archive, analyze, tone, refs, identity, http, cli) + UI helpers (archives, jobs, appview, format, ui, scroll)
+  lib/            engine (archive, analyze, tone, refs, identity, http, media, cli) + UI helpers (archives, jobs, appview, format, ui, scroll, media-view)
   middleware.ts   same-origin check for non-GET requests
   layouts/        Base (html shell, ClientRouter, masthead, theme toggle, scroll keeper) · AccountLayout (header + tabs, 404 when not archived)
   components/
@@ -16,8 +16,9 @@ src/
     jobs/         JobRunner (the only real island) · ArchiveForm · ToneControls · AnalysisActions · NoReport · UpgradeReport
     report/       HeadlineStats · ToneStat · ShapeSection · HoursChart · TargetingSection · ToneSection · InterestsSection
     records/      CollectionList · Pager · RootsToggle · RecordCard · RefList · PostEmbed · EmbedMedia · MediaThumbs
+    media/        MediaWall · MediaFilters · MediaDownload · MediaViewer
     account/      AccountHeader · AccountGrid
-  pages/          / · /accounts · /about · /a/[handle] · /a/[handle]/[snapshot]/{report,records/[...collection],identity}
+  pages/          / · /accounts · /about · /a/[handle] · /a/[handle]/[snapshot]/{report,records/[...collection],media,media/[cid],identity}
                   /blobs/[handle]/[file] · /api/jobs · /api/jobs/[id]/events · /api/jobs/[id]/confirm
   styles/         global.css (tokens + primitives) · media.css (the one breakpoint)
 ```
@@ -46,10 +47,10 @@ src/
 
 | route | purpose |
 |---|---|
-| `POST /api/jobs` | start `archive` or `analyze` (`{ mode, input, snapshot?, media?, analyze?, tone?, model?, toneLimit? }`) |
+| `POST /api/jobs` | start `archive`, `analyze` or `media` (`{ mode, input, snapshot?, media?, analyze?, tone?, model?, toneLimit? }`) |
 | `GET /api/jobs/:id/events` | SSE. Each event carries an `id`, and a reconnect with `Last-Event-ID` resumes rather than replaying |
 | `POST /api/jobs/:id/confirm` | answer a tone estimate `{ yes }` |
-| `GET /blobs/:handle/:file` | downloaded media |
+| `GET /blobs/:handle/:file` | downloaded media; `?download` adds `content-disposition: attachment` |
 
 - Jobs live in memory in the server process and are dropped an hour after they start.
 - When a job finishes, the page refreshes through the router (`navigate(current URL, { history: 'replace' })`) and keeps your scroll position. Free re-runs refresh on their own; after a paid tone pass the "Show the report" button does it, so you can read the actual cost first.
@@ -78,7 +79,21 @@ src/
 - **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference. `body` has bottom padding so the last row can always scroll clear of it, after it was found covering the Proceed button.
 - **Theme before paint:** an inline script in `Base.astro` applies the saved theme before first paint so night mode doesn't flash white. On router swaps the router copies the new page's `<html>` attributes, which would drop `data-theme`, so `ThemeToggle` writes the current theme onto the incoming document in `astro:before-swap`. The toggle itself is `transition:persist`.
 - **Scroll:** see [Scroll](#scroll).
-- **Stale styles in dev:** after editing a component's `<style>`, Astro's dev server has been seen serving the old CSS on full page loads while the file watcher reports the change. If a style edit seems to do nothing, restart `npm run dev` before debugging the CSS.
+- **Stale component modules in dev:** after editing an `.astro` file, Astro 7's dev server has twice served the old compiled `<style>` or `<script>` for that component (fetched with `cache: no-store`), while the file watcher reported the change and the markup updated. If an edit seems to do nothing, restart `npm run dev` before debugging the code. A production build never has this problem.
+
+## Media
+
+**TL;DR:** the Media tab (`/a/<handle>/<snapshot>/media`) is a wall of every downloaded file, filterable by type and source collection, 15 · 30 · 60 · 120 · 240 · 480 per page (default 60, remembered). Each file has a detail page with a viewer, alt text, size, download, and every record that uses it. Snapshots archived without media get a "Download media" job instead of an empty wall.
+
+- **Index:** `src/lib/media.ts` scans the snapshot's records once for blob refs and caches the result as `media-index.json` in the snapshot (about 200ms to build, around 10ms from cache). Each entry has the CID, MIME type, file name, latest use, and every use: the record, role (JSON path), alt text, text and self-labels. See [archive-format.md](archive-format.md#media).
+- **What's "downloaded":** whatever is in `archives/<handle>/blobs/` right now, checked per request. The Records tab uses the same check, so media downloaded after the archive (via the job or `slurp media`) shows locally there too. The `local` field on refs only reflects `--media` at archive time and isn't used for display.
+- **Download job:** `mode: 'media'` runs `downloadSnapshotMedia`, which downloads every file the snapshot references that isn't already on disk, 4 at a time, then updates `manifest.media`. Same as `slurp media <handle>` on the CLI.
+- **Per page:** a doubling ladder around the default, `PER_PAGE_STEPS` in `src/lib/media-view.ts`. The choice rides in `?per=` so links are explicit, and the wall saves it in the `slurp-media-per` cookie so a later visit without `?per=` uses it. Changing the size keeps the first visible tile on the new page (`pageStart`).
+- **Nothing on the Media tab resets scroll:** the type tabs, source picker, per-page picker, pager (both copies) and newest/oldest toggle all keep your position, and so do the detail page's Prev/Next and ←/→. See [Scroll](#scroll).
+- **Detail navigation:** Prev/Next and ←/→ step through the current filter with `history: 'replace'`, so the wall stays one Back away. "All media" and Esc go back in history when you came from the wall, which restores its scroll. Otherwise they navigate to the page of the wall that contains the file.
+- **Sensitive media:** files whose records self-label `porn`, `sexual`, `nudity`, `graphic-media` or `gore` are blurred on the wall and in the viewer until clicked (`SensitiveReveal`, shared with embeds).
+- **Empty filters:** the current type tab always shows, even at 0, and an empty result says what matched nothing, with links to widen it. The wall isn't rendered when there are no tiles, which avoids a doubled rule.
+- **Tiles:** `repeat(auto-fill, minmax(--tile, 1fr))` with per-tile right and bottom borders, clipped by the wall's `overflow: hidden`, so a partial last row doesn't leave ink blocks the way the `gap` hairline trick would.
 
 ## Scroll
 
@@ -87,7 +102,8 @@ src/
 - **Why `after-swap`:** the router swaps the DOM, scrolls to the top, and dispatches `astro:after-swap` in one synchronous step (`moveToLocation` then `triggerEvent` in `astro/dist/transitions/router.js`). Restoring there means the top-of-page frame never paints. A restore after load, as the earlier sessionStorage version did, always showed one frame at the top: that was the jump.
 - **Not persisted on purpose:** the collections list isn't `transition:persist`, because a persisted element keeps its old `aria-current` highlight. Its inner scroll is carried across the swap instead.
 - **Programmatic refreshes:** the thread-roots toggle and finished jobs call `keepScrollOnNextSwap()` before `navigate()`, so they refresh in place too.
-- **Deliberately not kept:** the pager and the account tabs (Report / Records / Identity). A new page of records or a different section should start at the top. Back and forward use the router's own saved position.
+- **Where it's on:** the collections list, the report's time-window tabs, and everything on the Media tab (type tabs, per-page picker and pager through `data-keep-scroll`; the source picker and the detail page's Prev/Next through `keepScrollOnNextSwap()`). `Pager` takes a `keepScroll` prop.
+- **Deliberately not kept:** the Records pager and the account tabs (Report / Records / Media / Identity), where a new page or section should start at the top. Opening a media tile also starts at the top, so the viewer is on screen. Back and forward use the router's own saved position.
 - **Adding it elsewhere:** put `data-keep-scroll` on the link container, and `data-scroll-id="<name>"` on any inner scrolling pane that should keep its own position.
 - **Prefetch:** hover prefetch is on for all links (`prefetch` in `astro.config.mjs`). `Ext` links (external sites and media) opt out, so hovering a video doesn't download it.
 - **Verified:** `feed.like` → `feed.repost` kept 480px / 120px, and `graph.follow` kept 620px / 200px, already restored at `after-swap`. The roots toggle kept 900px. A finished job refreshed at 4497px. The pager and the account tabs went to 0, back returned to 700, and night mode stayed on through 6 swaps. The whole run stayed in one document.

@@ -7,7 +7,7 @@ import Base from './Base.astro';
 
 interface Props {
   snap: Snapshot | null;
-  tab: 'report' | 'records' | 'identity';
+  tab: 'report' | 'records' | 'media' | 'identity';
 }
 
 const { snap, tab } = Astro.props;
@@ -23,7 +23,7 @@ const base = snap ? `/a/${snap.handle}/${snap.snapshot}` : '';
         <AccountHeader snap={snap} account={account} tab={tab} />
         <Tabs
           label="Account sections"
-          items={(['report', 'records', 'identity'] as const).map((t) => ({ href: `${base}/${t}`, label: t, current: t === tab }))}
+          items={(['report', 'records', 'media', 'identity'] as const).map((t) => ({ href: `${base}/${t}`, label: t, current: t === tab }))}
         />
         <slot />
       </>

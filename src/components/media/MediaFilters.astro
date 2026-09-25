@@ -1,0 +1,74 @@
+---
+import { fmt } from '../../lib/format.ts';
+import type { MediaItem } from '../../lib/media.ts';
+import { filterMedia, KIND_LABEL, MEDIA_KINDS, mediaSearch, pageStart, PER_PAGE_STEPS, sourceLabel, type MediaQuery } from '../../lib/media-view.ts';
+import Cell from '../ui/Cell.astro';
+import Grid from '../ui/Grid.astro';
+import Tabs from '../ui/Tabs.astro';
+
+interface Props {
+  base: string;
+  items: MediaItem[];
+  query: MediaQuery;
+}
+
+const { base, items, query } = Astro.props;
+const byType = filterMedia(items, query, 'type');
+const count = (kind: MediaQuery['type']) => (kind === 'all' ? byType.length : byType.filter((i) => i.kind === kind).length);
+const sources = new Map<string, number>();
+for (const i of items) for (const c of new Set(i.uses.map((u) => u.collection))) sources.set(c, (sources.get(c) ?? 0) + 1);
+---
+
+<Tabs
+  label="Media type"
+  keepScroll
+  items={MEDIA_KINDS.filter((k) => k === 'all' || k === query.type || count(k) > 0).map((k) => ({
+    href: `${base}${mediaSearch(query, { type: k, offset: 0 })}`,
+    label: `${KIND_LABEL[k]} · ${fmt(count(k))}`,
+    current: k === query.type,
+  }))}
+/>
+<Grid>
+  <Cell class="bar">
+    <label class="field">
+      <span class="kicker">Source</span>
+      <select class="input small" data-media-source data-base={base} data-query={mediaSearch({ ...query, source: null, offset: 0 })}>
+        <option value="" selected={!query.source}>Every collection · {fmt(items.length)}</option>
+        {[...sources].sort((a, b) => b[1] - a[1]).map(([c, n]) => <option value={c} selected={c === query.source}>{sourceLabel(c)} · {fmt(n)}</option>)}
+      </select>
+    </label>
+    <div class="field">
+      <span class="kicker">Per page</span>
+      <nav class="per" aria-label="Media per page" data-keep-scroll>
+        {PER_PAGE_STEPS.map((n) => (
+          <a href={`${base}${mediaSearch(query, { per: n, offset: pageStart(query.offset, n) })}`} aria-current={n === query.per ? 'page' : undefined}>{n}</a>
+        ))}
+      </nav>
+    </div>
+  </Cell>
+</Grid>
+
+<script>
+  import { navigate } from 'astro:transitions/client';
+  import { keepScrollOnNextSwap } from '../../lib/scroll.ts';
+
+  document.addEventListener('change', (e) => {
+    const select = (e.target as HTMLElement).closest<HTMLSelectElement>('[data-media-source]');
+    if (!select) return;
+    const params = new URLSearchParams(select.dataset.query);
+    if (select.value) params.set('source', select.value);
+    const qs = params.toString();
+    keepScrollOnNextSwap();
+    navigate(`${select.dataset.base}${qs ? `?${qs}` : ''}`);
+  });
+</script>
+
+<style>
+  .bar { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-md); align-items: end; }
+  .per { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--line); background: var(--ink); border: var(--line) solid var(--ink); }
+  .per a { display: grid; place-items: center; min-height: var(--control); background: var(--paper); text-decoration: none; font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+  .per a:hover, .per a[aria-current='page'] { background: var(--ink); color: var(--paper); }
+  @media (--narrow) {
+    .bar { grid-template-columns: minmax(0, 1fr); }
+  }
+</style>
