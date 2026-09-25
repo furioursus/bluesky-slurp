@@ -50,7 +50,9 @@ export async function resolveSnapshot(pathOrHandle: string, out: string): Promis
       if (latest) return join(snaps, latest);
     }
   }
-  throw new Error(`no snapshot found for ${pathOrHandle} (tried ${candidates.join(', ')})`);
+  throw new Error(
+    `no snapshot found for ${pathOrHandle} (tried ${candidates.join(', ')}). Archive it first: slurp ${pathOrHandle} (add --tone to archive and analyze in one go)`,
+  );
 }
 
 async function readCollection(snap: string, collection: string): Promise<Line[]> {
@@ -359,8 +361,14 @@ export async function runAnalyze(target: string, out: string, tone?: ToneOptions
   const snap = await resolveSnapshot(target, out);
   const { report, candidates } = await analyzeWithCandidates(snap);
   if (tone) {
-    const results = await runTone(snap, candidates, tone, log);
-    if (Object.keys(results).length) report.tone = summarizeTone(results);
+    // a failed tone pass (no credentials, API outage) shouldn't cost the structural report
+    try {
+      const results = await runTone(snap, candidates, tone, log);
+      if (Object.keys(results).length) report.tone = summarizeTone(results);
+    } catch (err) {
+      log(`⚠ tone pass failed: ${(err as Error).message}`);
+      log('  writing the report without it');
+    }
   }
   await writeFile(join(snap, 'analysis.json'), `${JSON.stringify(report, null, 2)}\n`);
   await writeFile(join(snap, 'analysis.md'), toMarkdown(report));
