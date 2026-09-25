@@ -1,9 +1,3 @@
-/**
- * Optional Claude tone pass: labels a person's replies and quotes (with the post they
- * were answering as context), after showing a token + cost estimate and asking first.
- *
- * Labels are cached per post URI in the snapshot's tone.json, so re-runs only pay for new items.
- */
 import { existsSync } from 'node:fs';
 import { readFile, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -15,7 +9,6 @@ export const DEFAULT_MODEL = 'claude-sonnet-5';
 const BATCH = 20;
 const CONCURRENCY = 3;
 
-/** $ per million tokens. Cache reads bill at 0.1x input, 5-minute cache writes at 1.25x. */
 const PRICES: Record<string, { input: number; output: number }> = {
   'claude-fable-5-1': { input: 10, output: 50 },
   'claude-opus-5-5': { input: 4, output: 20 },
@@ -24,7 +17,6 @@ const PRICES: Record<string, { input: number; output: number }> = {
   'claude-sonnet-5': { input: 2, output: 10 },
   'claude-haiku-4-5': { input: 1, output: 5 },
 };
-/** Models that accept server-side refusal fallbacks (`fallbacks: "default"`). */
 const FALLBACK_MODELS = new Set(['claude-opus-5', 'claude-fable-5-1']);
 
 export const LABELS = ['genuine', 'supportive', 'playful', 'disagreeing', 'argumentative', 'hostile', 'trolling', 'unclear'] as const;
@@ -37,7 +29,6 @@ export interface ToneCandidate {
   kind: 'reply' | 'quote';
   text: string;
   targetUri: string;
-  /** true when aimed at someone they don't follow and have never liked */
   cold: boolean;
   followed: boolean;
   at: number;
@@ -59,7 +50,6 @@ export interface ToneEstimate {
   inputTokens: number;
   outputLow: number;
   outputHigh: number;
-  /** dollars; null when the model has no price on file */
   costLow: number | null;
   costHigh: number | null;
 }
@@ -68,7 +58,6 @@ export interface ToneOptions {
   model: string;
   limit: number;
   yes: boolean;
-  /** asked before any paid request; defaults to a y/N prompt on the terminal */
   confirm?: (estimate: ToneEstimate) => Promise<boolean>;
 }
 
@@ -117,7 +106,6 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
-/** Pick what to send: the most recent cold items, plus a smaller warm sample as a baseline. */
 export function selectCandidates(all: ToneCandidate[], limit: number): ToneCandidate[] {
   const byRecent = [...all].sort((a, b) => b.at - a.at);
   const coldQuota = Math.ceil(limit * 0.75);
@@ -126,7 +114,6 @@ export function selectCandidates(all: ToneCandidate[], limit: number): ToneCandi
   return [...cold, ...warm];
 }
 
-/** Fetch the text of the posts being replied to / quoted, 25 at a time, from the public AppView. */
 async function hydrate(uris: string[]): Promise<Map<string, { author: string; text: string }>> {
   const out = new Map<string, { author: string; text: string }>();
   const unique = [...new Set(uris)];
@@ -207,7 +194,6 @@ export async function runTone(
     output_config: { effort: 'low' as const, format: { type: 'json_schema' as const, schema: SCHEMA } },
   };
 
-  // Exact input tokens via count_tokens (free); output is a range since thinking length varies.
   log('  counting tokens…');
   let inputTokens = 0;
   try {
@@ -215,7 +201,7 @@ export async function runTone(
       inputTokens += (await client.beta.messages.countTokens({ ...base, messages: r.messages })).input_tokens;
     }
   } catch (err) {
-    // AuthenticationError = bad key; a plain Error here = no credentials configured at all
+    // see docs/tone-pass.md#credentials
     if (err instanceof Anthropic.AuthenticationError || !(err instanceof Anthropic.APIError)) {
       throw new Error(`no working Claude API credentials (${(err as Error).message.split('.')[0]}). Set ANTHROPIC_API_KEY or run \`ant auth login\`.`);
     }
@@ -241,7 +227,7 @@ export async function runTone(
     return pick(cache, chosen);
   }
 
-  // requests finish concurrently: chain saves so writes never overlap, and write-then-rename so a crash can't truncate
+  // see docs/tone-pass.md#label-cache
   let saving = Promise.resolve();
   const save = () =>
     (saving = saving.then(async () => {
@@ -302,13 +288,12 @@ function pick(cache: Record<string, ToneResult>, chosen: ToneCandidate[]): Recor
   return Object.fromEntries(chosen.filter((c) => cache[c.uri]).map((c) => [c.uri, cache[c.uri]]));
 }
 
-/** Aggregate labels into a cold-vs-warm comparison with example links per label. */
 export function summarizeTone(results: Record<string, ToneResult>) {
   const rows = Object.values(results).filter((r) => r.label !== 'refused');
   const share = (rs: ToneResult[]) => {
     const counts = Object.fromEntries(LABELS.map((l) => [l, rs.filter((r) => r.label === l).length]));
     const badFaith = rs.filter((r) => BAD_FAITH.includes(r.label as Label)).length;
-    // null, not 0, when nothing was sampled: "no data" must never read as "no bad faith"
+    // see docs/analysis.md#empty-samples
     return { total: rs.length, counts, pctBadFaith: rs.length ? Math.round((badFaith / rs.length) * 1000) / 10 : null };
   };
   const examples = Object.fromEntries(

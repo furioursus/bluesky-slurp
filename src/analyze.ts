@@ -1,10 +1,3 @@
-/**
- * Offline behavior + interest analysis over a snapshot.
- *
- * Deliberately reports signals with evidence links, never a verdict: structural
- * patterns (who they reply to, how often cold, how fixated) are strong tells, but
- * any single number misreads someone. The reader makes the call.
- */
 import { existsSync } from 'node:fs';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -30,15 +23,12 @@ interface Post {
   line: Line;
   at: number;
   kind: Kind;
-  /** DID of the account being replied to / quoted, when it isn't self */
   target: string | null;
-  /** at:// URI of the post being replied to / quoted */
   targetUri?: string;
 }
 
 const didOf = (uri: string) => uri.slice(5).split('/')[0];
 
-/** Resolve a snapshot dir from either a path or an account dir (picks the latest snapshot). */
 export async function resolveSnapshot(pathOrHandle: string, out: string): Promise<string> {
   const candidates = [pathOrHandle, join(out, pathOrHandle.replace(/^@/, ''))];
   for (const c of candidates) {
@@ -90,11 +80,10 @@ function countBy<T>(items: T[], key: (t: T) => string | null | undefined): Map<s
 }
 
 const top = (m: Map<string, number>, n: number) => [...m].sort((a, b) => b[1] - a[1]).slice(0, n);
-/** Percentage to one decimal, or null when there's no denominator (so "none" never renders as 0%). */
+// see docs/analysis.md#empty-samples
 const pct = (a: number, b: number): number | null => (b ? Math.round((a / b) * 1000) / 10 : null);
 const pc = (n: number | null) => (n == null ? 'n/a' : `${n}%`);
 
-/** One-sentence cold-vs-warm tone comparison that stays honest when a side has no posts. */
 export function toneSentence(t: { cold: { total: number; pctBadFaith: number | null }; warm: { total: number; pctBadFaith: number | null } }): string {
   const { cold, warm } = t;
   if (cold.total && warm.total) {
@@ -120,7 +109,6 @@ async function resolveHandles(dids: string[]): Promise<Map<string, string>> {
   return out;
 }
 
-/** Time windows every stat is computed for, counted back from the snapshot date. */
 export const WINDOWS = [
   { key: '30d', label: 'Last 30 days', days: 30 },
   { key: '90d', label: 'Last 3 months', days: 90 },
@@ -146,12 +134,11 @@ async function analyzeWithCandidates(snap: string) {
     ),
   );
   const posts = postLines.map((l) => classify(l, self));
-  // Relationships are as of the snapshot: the archive can't know who they followed back then.
+  // see docs/analysis.md#cold-outreach
   const followed = new Set(follows.map((f) => f.record.subject as string));
   const likedAuthors = countBy(likes, (l) => l.record.subject?.uri && didOf(l.record.subject.uri));
   const isCold = (did: string) => !followed.has(did) && !likedAuthors.has(did);
 
-  /** Every stat for records created at or after `since` (null = all time). */
   const windowStats = (since: number | null) => {
     const inWindow = <T extends { at?: number; createdAt?: string | null }>(xs: T[], at: (x: T) => number) =>
       since == null ? xs : xs.filter((x) => at(x) >= since);
@@ -159,7 +146,6 @@ async function analyzeWithCandidates(snap: string) {
     const lk = inWindow(likes, ts);
     const rp = inWindow(reposts, ts);
 
-    // shape
     const c = countBy(ps, (p) => p.kind);
     const outward = ps.filter((p) => p.target);
     const quotes = outward.filter((p) => p.kind === 'quote');
@@ -169,11 +155,9 @@ async function analyzeWithCandidates(snap: string) {
     for (const p of ps) if (!Number.isNaN(p.at)) hours[new Date(p.at).getUTCHours()]++;
     const perDay = countBy(ps, (p) => (Number.isNaN(p.at) ? null : new Date(p.at).toISOString().slice(0, 10)));
 
-    // targeting
     const replyTargets = countBy(outward.filter((p) => p.kind === 'reply'), (p) => p.target);
     const quoteTargets = countBy(quotes, (p) => p.target);
     const strangerQuotes = quotes.filter((p) => isCold(p.target!));
-    // fixation: bursts of 5+ replies to the same non-followed account within 24h
     const bursts: { did: string; count: number; day: string; examples: string[] }[] = [];
     const byTarget = new Map<string, Post[]>();
     for (const p of outward) {
@@ -195,7 +179,6 @@ async function analyzeWithCandidates(snap: string) {
     }
     bursts.sort((a, b) => b.count - a.count);
 
-    // interests
     const tags = new Map<string, number>();
     const domains = new Map<string, number>();
     for (const p of ps) {
@@ -222,7 +205,6 @@ async function analyzeWithCandidates(snap: string) {
         quotesOfOthers: quotes.length,
         pctRepliesToOthers: pct(c.get('reply') ?? 0, ps.length),
         pctQuotes: pct(quotes.length, ps.length),
-        // "cold" = aimed at someone they don't follow and have never liked a post from
         pctOutwardToNonFollowed: pct(nonFollowed.length, outward.length),
         pctOutwardToStrangers: pct(cold.length, outward.length),
         likes: lk.length,
@@ -253,7 +235,6 @@ async function analyzeWithCandidates(snap: string) {
 
   const computed = WINDOWS.map((w) => ({ ...w, since: w.days == null ? null : now - w.days * DAY, stats: windowStats(w.days == null ? null : now - w.days * DAY) }));
 
-  // one batched handle lookup for everyone named in any window
   const named = new Set<string>();
   for (const { stats } of computed) {
     for (const list of [stats.raw.replyTargets, stats.raw.quoteTargets, stats.raw.liked, stats.raw.reposted]) for (const [d] of list) named.add(d);
@@ -316,9 +297,7 @@ async function analyzeWithCandidates(snap: string) {
     },
     windows: WINDOWS.map((w) => w.key),
     byWindow,
-    /** all time only: per-collection counts have no timestamps to window by */
     appsUsed: top(apps, 30).map(([app, records]) => ({ app, records })),
-    /** which posts the tone labels actually cover (the sample is most-recent-first) */
     toneCoverage: null as { labelled: number; from: string; to: string } | null,
   };
   return { report, candidates: toneCandidates };
@@ -374,7 +353,6 @@ interface WindowReport {
 
 type Report = Awaited<ReturnType<typeof analyze>>;
 
-/** Attach tone summaries to every window, using each labelled post's timestamp. */
 function applyTone(report: Report, candidates: ToneCandidate[], results: Record<string, ToneResult>) {
   const at = new Map(candidates.map((c) => [c.uri, c.at]));
   const labelled = Object.keys(results).filter((u) => at.has(u));
@@ -481,11 +459,9 @@ export async function runAnalyze(target: string, out: string, tone?: ToneOptions
   const snap = await resolveSnapshot(target, out);
   const { report, candidates } = await analyzeWithCandidates(snap);
   if (!tone && existsSync(join(snap, 'tone.json'))) {
-    // keep an earlier tone pass in the report when re-running the free analysis
     applyTone(report, candidates, JSON.parse(await readFile(join(snap, 'tone.json'), 'utf8')));
   }
   if (tone) {
-    // a failed tone pass (no credentials, API outage) shouldn't cost the structural report
     try {
       applyTone(report, candidates, await runTone(snap, candidates, tone, log));
     } catch (err) {

@@ -1,35 +1,19 @@
-/**
- * Pointers from a record to the things it interacts with: the post a like targets,
- * the parent of a reply, the account a follow points at, embedded media, and so on.
- *
- * Extraction is generic (walk the record, pick up every at:// URI, DID, blob and
- * outbound link) so it works for any lexicon on the atmosphere. Bluesky collections
- * then get friendly role names on top.
- */
-
 export type RefKind = 'record' | 'account' | 'blob' | 'link';
 
 export interface Ref {
-  /** what this pointer means, e.g. "liked", "reply-parent", "quoted", "mentioned" */
   role: string;
   kind: RefKind;
-  /** where in the record it was found, e.g. "reply.parent" */
   path: string;
-  /** canonical address: at:// URI, DID, blob CID, or https URL */
   target: string;
-  /** a link a human can open in a browser */
   web: string;
-  /** strongRef CID: the exact version of the record that was interacted with */
   cid?: string;
   mimeType?: string;
-  /** set when media was downloaded: path relative to the archive root */
   local?: string;
 }
 
 const AT_URI = /^at:\/\/([^/]+)(?:\/([^/]+)(?:\/([^/]+))?)?$/;
 const DID = /^did:(plc|web):[A-Za-z0-9._:%-]+$/;
 
-/** Best human-facing URL for an at:// URI. Bluesky types go to bsky.app, anything else to pdsls.dev. */
 export function webUrlForUri(uri: string): string {
   const m = uri.match(AT_URI);
   if (!m) return uri;
@@ -52,7 +36,6 @@ export function webUrlForDid(did: string): string {
   return `https://bsky.app/profile/${did}`;
 }
 
-/** Friendly role for a pointer, given the collection it lives in and where it was found. */
 function roleFor(collection: string, path: string, kind: RefKind): string {
   if (kind === 'blob') return 'media';
   if (path === 'subject' || path === 'subject.uri') {
@@ -66,7 +49,6 @@ function roleFor(collection: string, path: string, kind: RefKind): string {
       'app.bsky.graph.verification': 'verified',
     };
     if (byCollection[collection]) return byCollection[collection];
-    // other apps reuse Bluesky's naming (sh.tangled.graph.follow, id.sifa.graph.follow, …)
     const suffix = collection.split('.').slice(-2).join('.');
     const bySuffix: Record<string, string> = {
       'feed.like': 'liked',
@@ -89,10 +71,6 @@ function roleFor(collection: string, path: string, kind: RefKind): string {
   return path;
 }
 
-/**
- * Walk a JSON-form record and collect every pointer in it.
- * `blobUrl` builds a fetchable URL for a blob CID (from the author's PDS).
- */
 export function extractRefs(collection: string, record: unknown, blobUrl: (cid: string) => string): Ref[] {
   const refs: Ref[] = [];
   const seen = new Set<string>();
@@ -122,7 +100,6 @@ export function extractRefs(collection: string, record: unknown, blobUrl: (cid: 
       push({ kind: 'blob', path, target: cid, web: blobUrl(cid), mimeType: obj.mimeType });
       return;
     }
-    // strongRef {uri, cid}: report at the object's own path so "reply.parent" reads naturally
     if (typeof obj.uri === 'string' && AT_URI.test(obj.uri)) {
       push({
         kind: 'record',
@@ -132,7 +109,6 @@ export function extractRefs(collection: string, record: unknown, blobUrl: (cid: 
         ...(typeof obj.cid === 'string' ? { cid: obj.cid } : {}),
       });
     }
-    // facet mention {did} and similar: report at the containing object
     if (typeof obj.did === 'string' && DID.test(obj.did)) {
       push({ kind: 'account', path, target: obj.did, web: webUrlForDid(obj.did) });
     }

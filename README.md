@@ -2,6 +2,17 @@
 
 **TL;DR:** `slurp <handle>` archives everything an atproto account has publicly put on the network, from every app, not just Bluesky. Every interaction carries a clickable pointer to what it targets. Media is opt-in (`--media`). `slurp analyze <handle>` turns an archive into a behavior and interests report built from signals and evidence links. It never gives a verdict. `--tone` adds an optional Claude pass that labels replies and quotes, after showing a token and cost estimate.
 
+## Docs
+
+**TL;DR:** the "why" behind the code lives here. Code has no comments except one-line links into these files for traps and security choices.
+
+| doc | covers |
+|---|---|
+| [docs/archive-format.md](docs/archive-format.md) | directory layout, record JSON, record order, the `refs` pointer format |
+| [docs/analysis.md](docs/analysis.md) | signals vs verdicts, cold outreach, reply bursts, time windows, empty samples, tone coverage |
+| [docs/tone-pass.md](docs/tone-pass.md) | sampling, the cost estimate, credentials, the label cache, refusals |
+| [docs/web-ui.md](docs/web-ui.md) | local-only security, rendering untrusted text, the API, embeds, design decisions |
+
 ## Usage
 
 **TL;DR:** Node ≥ 23.6, `npm install`, then run `src/cli.ts` directly, or use `npm run slurp -- <args>`, which also loads `.env`. There's no build step.

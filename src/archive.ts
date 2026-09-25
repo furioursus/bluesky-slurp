@@ -8,7 +8,6 @@ import { extractRefs, webUrlForUri, type Ref } from './refs.ts';
 
 export interface ArchiveOptions {
   media: boolean;
-  /** archive root, e.g. ./archives */
   out: string;
 }
 
@@ -26,7 +25,6 @@ const MIME_EXT: Record<string, string> = {
   'application/pdf': 'pdf',
 };
 
-/** Fetch an account's repo (+ identity, profile, optional media) into a new snapshot directory. */
 export async function archiveAccount(input: string, opts: ArchiveOptions, log: (msg: string) => void) {
   const fetchedAt = new Date().toISOString();
 
@@ -53,14 +51,15 @@ export async function archiveAccount(input: string, opts: ArchiveOptions, log: (
   log(`  ${(car.byteLength / 1024 / 1024).toFixed(1)} MB`);
 
   const blobUrl = (cid: string) => xrpc(id.pds, 'com.atproto.sync.getBlob', { did: id.did, cid });
-  const blobs = new Map<string, string | undefined>(); // cid → mimeType
+  const blobs = new Map<string, string | undefined>();
   const counts: Record<string, number> = {};
   const streams = new Map<string, WriteStream>();
   const selfLabels = new Set<string>();
 
   log('decoding records…');
   for (const entry of fromUint8Array(car)) {
-    const record = JSON.parse(JSON.stringify(entry.record)); // CidLink → {$link}, bytes → {$bytes}
+    // see docs/archive-format.md#record-json
+    const record = JSON.parse(JSON.stringify(entry.record));
     const uri = `at://${id.did}/${entry.collection}/${entry.rkey}`;
     const refs: Ref[] = extractRefs(entry.collection, record, blobUrl);
 

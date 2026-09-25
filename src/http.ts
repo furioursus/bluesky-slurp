@@ -12,7 +12,6 @@ export class HttpError extends Error {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** GET with retries on 429/5xx/network errors. Honors ratelimit-reset when present. */
 export async function get(url: string, retries = 5): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     let res: Response;
@@ -45,7 +44,6 @@ export function xrpc(host: string, method: string, params: Record<string, string
   return u.toString();
 }
 
-/** Run `fn` over `items` with at most `n` in flight. */
 export async function pool<T>(items: T[], n: number, fn: (item: T) => Promise<void>): Promise<void> {
   let i = 0;
   const workers = Array.from({ length: Math.min(n, items.length) }, async () => {

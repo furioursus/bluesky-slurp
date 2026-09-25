@@ -7,16 +7,13 @@ const PLC = 'https://plc.directory';
 export interface Identity {
   did: string;
   handle: string | null;
-  /** true when the handle resolves back to the same DID */
   handleVerified: boolean;
   pds: string;
   didDoc: any;
-  /** did:plc only: every handle this account has claimed, oldest first */
   handleHistory: { handle: string; since: string }[] | null;
   plcAuditLog: any[] | null;
 }
 
-/** Accepts a handle, @handle, DID, at:// URI, or a bsky.app profile/post URL. */
 export function normalizeInput(raw: string): string {
   let s = raw.trim();
   const url = s.match(/^https?:\/\/[^/]+\/profile\/([^/?#]+)/);
@@ -40,7 +37,6 @@ export async function resolveHandle(handle: string): Promise<string> {
       if (did.startsWith('did:')) return did;
     }
   } catch {}
-  // Last resort: ask the Bluesky AppView (covers odd DNS setups on this machine).
   const { did } = await getJson(xrpc(PUBLIC_APPVIEW, 'com.atproto.identity.resolveHandle', { handle }));
   return did;
 }
@@ -98,7 +94,6 @@ export async function resolveIdentity(input: string): Promise<Identity> {
   };
 }
 
-/** The Bluesky AppView's view of the profile (counts, labels). Null if the account has no Bluesky presence. */
 export async function fetchBskyProfile(did: string): Promise<any | null> {
   try {
     return await getJson(xrpc(PUBLIC_APPVIEW, 'app.bsky.actor.getProfile', { actor: did }));

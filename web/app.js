@@ -1,4 +1,3 @@
-// Slurp UI. No build step: plain ES module, DOM built with h() so archived text is never parsed as HTML.
 
 const view = document.getElementById('view');
 const APPVIEW = 'https://public.api.bsky.app/xrpc';
@@ -6,13 +5,12 @@ const LABELS = ['genuine', 'supportive', 'playful', 'disagreeing', 'argumentativ
 const BAD_FAITH = new Set(['argumentative', 'hostile', 'trolling']);
 const MODELS = ['claude-sonnet-5', 'claude-opus-5', 'claude-haiku-4-5', 'claude-opus-5-5', 'claude-fable-5-1'];
 
-// ---- dom helpers ---------------------------------------------------------
-
 function safeHref(v) {
   const s = String(v);
   return /^(https?:\/\/|#|\/)/.test(s) ? s : '#';
 }
 
+// see docs/web-ui.md#rendering-untrusted-text
 function h(tag, props, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(props ?? {})) {
@@ -38,7 +36,6 @@ const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString('en-US'));
 const pct = (n) => (n == null ? '—' : `${n}%`);
 const money = (n) => (n == null ? null : `$${n.toFixed(n < 1 ? 3 : 2)}`);
 const day = (iso) => (iso ? iso.slice(0, 10) : '—');
-/** Compact local timestamp for tight spots: 2026-09-25 14:19 */
 const stamp = (iso) => {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -69,8 +66,6 @@ function setNav(key) {
 let config = null;
 const getConfig = async () => (config ??= await api('/api/config'));
 
-// ---- handle resolution for pointers (public AppView, batched) --------------
-
 const handles = new Map();
 
 async function resolveHandles(dids) {
@@ -85,7 +80,6 @@ async function resolveHandles(dids) {
   }
 }
 
-/** Swap every [data-did] label for @handle once resolved. */
 async function hydrateHandles(root) {
   const els = [...root.querySelectorAll('[data-did]')];
   await resolveHandles(els.map((el) => el.dataset.did));
@@ -97,7 +91,6 @@ async function hydrateHandles(root) {
 
 const didOf = (target) => (target.startsWith('at://') ? target.slice(5).split('/')[0] : target);
 
-/** Human label for a ref target: "@handle · post 3kx…" style, filled in after handle lookup. */
 function refLabel(ref) {
   if (ref.kind === 'link') return ref.target.replace(/^https?:\/\//, '');
   if (ref.kind === 'blob') return `${ref.mimeType ?? 'blob'} · ${ref.target.slice(0, 16)}…`;
@@ -106,8 +99,6 @@ function refLabel(ref) {
   const suffix = rest.length ? ` · ${rest[0].split('.').pop()} ${rest[1] ?? ''}` : '';
   return h('span', { 'data-did': did, 'data-suffix': suffix }, `${did}${suffix}`);
 }
-
-// ---- embedded posts (for likes and reposts) ------------------------------------
 
 const EMBED_ROLES = new Set(['liked', 'reposted']);
 const EMBED_KICKER = { 'reply-root': 'Thread root', 'reply-parent': 'Replying to', liked: 'Liked post', reposted: 'Reposted post' };
@@ -121,7 +112,6 @@ const prefs = {
   },
 };
 
-/** Which pointers get an embedded post card: likes/reposts and reply parents always, thread roots on request. */
 function embedTargets(pointers) {
   const isPost = (x) => x.kind === 'record' && x.target.includes('/app.bsky.feed.post/');
   const parent = pointers.find((x) => x.role === 'reply-parent');
@@ -130,11 +120,10 @@ function embedTargets(pointers) {
     x.role === 'reply-parent' ||
     (x.role === 'reply-root' && prefs.showRoots && x.target !== parent?.target)
   ));
-  // read a thread top-down: root, then the post being answered
   return picked.sort((a, b) => (a.role === 'reply-root' ? -1 : b.role === 'reply-root' ? 1 : 0));
 }
 const SENSITIVE = new Set(['porn', 'sexual', 'nudity', 'graphic-media', 'gore']);
-const posts = new Map(); // at:// uri → PostView, or null when deleted/hidden
+const posts = new Map();
 
 async function fetchPosts(uris) {
   const todo = [...new Set(uris)].filter((u) => !posts.has(u));
@@ -144,12 +133,10 @@ async function fetchPosts(uris) {
       const res = await fetch(`${APPVIEW}/app.bsky.feed.getPosts?${batch.map((u) => `uris=${encodeURIComponent(u)}`).join('&')}`);
       for (const p of (await res.json()).posts ?? []) posts.set(p.uri, p);
     } catch {}
-    // anything the AppView didn't return is deleted, taken down, or hidden from logged-out viewers
     for (const u of batch) if (!posts.has(u)) posts.set(u, null);
   }
 }
 
-/** Replace every [data-embed-uri] placeholder with a card for that post. */
 async function hydrateEmbeds(root) {
   const slots = [...root.querySelectorAll('[data-embed-uri]')];
   if (!slots.length) return;
@@ -193,7 +180,6 @@ function postEmbed(uri, p) {
   );
 }
 
-/** Images, video poster, link card, and quoted post, from the AppView's hydrated embed view. */
 function embedMedia(e, blurToggle) {
   if (!e) return null;
   const type = e.$type ?? '';
@@ -218,9 +204,6 @@ function embedMedia(e, blurToggle) {
   return null;
 }
 
-// ---- job panel -------------------------------------------------------------
-
-/** Starts a job and returns a panel that streams its log, asks about tone estimates, and calls onDone. */
 async function jobPanel(request, onDone) {
   const log = h('pre', { class: 'log', 'aria-live': 'polite' });
   const status = h('span', { class: 'kicker' }, 'starting');
@@ -296,8 +279,6 @@ function toneControls(cfg, { withToggle = true } = {}) {
   return { el, tone, model, limit };
 }
 
-// ---- home ------------------------------------------------------------------
-
 async function homeView() {
   setNav('home');
   const cfg = await getConfig();
@@ -363,8 +344,6 @@ function accountGrid(accounts) {
   }));
 }
 
-// ---- accounts ----------------------------------------------------------------
-
 async function accountsView() {
   setNav('accounts');
   const accounts = await api('/api/accounts');
@@ -373,8 +352,6 @@ async function accountsView() {
   }
   render(grid('cols-side', cell({ class: 'stack' }, h('h1', { class: 'display' }, 'Accounts'), h('p', { class: 'muted' }, `${accounts.length} archived`)), cell({ class: 'flush' }, accountGrid(accounts))));
 }
-
-// ---- account -------------------------------------------------------------------
 
 async function accountView(handle, snapshot, tab = 'report', rest = [], query) {
   setNav('accounts');
@@ -423,8 +400,6 @@ async function accountView(handle, snapshot, tab = 'report', rest = [], query) {
   hydrateEmbeds(body);
 }
 
-// ---- report ------------------------------------------------------------------------
-
 function analysisActions(handle, snapshot, cfg, hasTone) {
   const tone = toneControls(cfg, { withToggle: false });
   const slot = h('div');
@@ -445,10 +420,6 @@ function analysisActions(handle, snapshot, cfg, hasTone) {
   );
 }
 
-/**
- * Headline tone number: bad-faith share on cold posts, with the warm baseline spelled out underneath.
- * Keyed on sample sizes, not percentages, so an empty side reads as "not sampled" rather than 0%.
- */
 function toneStat(t, hasTonePass = !!t, note = null) {
   const kicker = h('p', { class: 'kicker' }, 'Bad faith, cold');
   if (!t) return cell({ class: 'stack' }, kicker, h('p', { class: 'big-number' }, '—'), h('p', { class: 'muted' }, hasTonePass ? 'no labelled posts in this window' : 'no tone pass yet'));
@@ -462,7 +433,6 @@ function toneStat(t, hasTonePass = !!t, note = null) {
   return cell({ class: 'stack' }, kicker, h('p', { class: 'big-number' }, big), h('p', { class: 'muted' }, sub), note && h('p', { class: 'muted', style: 'font-size:.8rem' }, 'sample-limited, see Tone below'));
 }
 
-/** Same wording as the Markdown report (src/analyze.ts toneSentence). */
 function toneSentence({ cold, warm }) {
   if (cold.total && warm.total) {
     const thin = warm.total < 10 || cold.total < 10 ? ` Small sample (${cold.total} cold, ${warm.total} warm), so read the gap loosely.` : '';
@@ -473,14 +443,12 @@ function toneSentence({ cold, warm }) {
   return 'No replies or quotes were labelled.';
 }
 
-/** "Last 30 days: up 4.3 pts from all time". Only calls it a change at 3+ points. */
 const trend = (label, delta) =>
   `${label}: ${delta >= 3 ? `up ${delta.toFixed(1)} pts from` : delta <= -3 ? `down ${Math.abs(delta).toFixed(1)} pts from` : 'about the same as'} all time`;
 
 const WINDOW_TABS = { '30d': '30 days', '90d': '3 months', '180d': '6 months', '365d': '1 year', all: 'All time' };
 const shortDate = (iso) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-/** Does this window reach further back than the tone sample? Then its tone numbers are the sample's, not the window's. */
 const toneOutrunsSample = (w, coverage) => coverage && (!w.since || Date.parse(w.since) < Date.parse(coverage.from));
 
 function reportView(handle, snapshot, r, cfg, query) {
@@ -501,7 +469,6 @@ function reportView(handle, snapshot, r, cfg, query) {
       slot);
   }
   if (!r.byWindow) {
-    // report saved before time windows existed: one free re-run upgrades it (tone labels are kept)
     const slot = h('div');
     return h('div', {},
       grid('cols-1', cell({ class: 'empty' },
@@ -514,7 +481,7 @@ function reportView(handle, snapshot, r, cfg, query) {
   const key = r.windows.includes(query.get('w')) ? query.get('w') : 'all';
   const W = r.byWindow[key];
   const ALL = r.byWindow.all;
-  const cmp = key === 'all' ? r.byWindow['90d'] : ALL; // what the headline compares against
+  const cmp = key === 'all' ? r.byWindow['90d'] : ALL;
   const s = W.shape;
   const base = `#/a/${handle}/${snapshot}/report`;
 
@@ -539,7 +506,6 @@ function reportView(handle, snapshot, r, cfg, query) {
 
   const coldNow = s.pctOutwardToStrangers;
   const coldCmp = cmp.shape.pctOutwardToStrangers;
-  // always describe the shorter window relative to all time
   const recentW = key === 'all' ? cmp : W;
   const trendText = coldNow == null || coldCmp == null
     ? 'no replies or quotes to compare'
@@ -633,8 +599,6 @@ function toneSection(t, section, label, coverage, note) {
   );
 }
 
-// ---- records ---------------------------------------------------------------------------
-
 async function recordsView(handle, snapshot, m, collection, query) {
   const base = `#/a/${handle}/${snapshot}/records`;
   const cols = Object.entries(m.counts);
@@ -643,7 +607,6 @@ async function recordsView(handle, snapshot, m, collection, query) {
   const order = query.get('order') === 'oldest' ? 'oldest' : 'newest';
   const limit = 50;
 
-  // group collections by app namespace
   const groups = new Map();
   for (const [c, n] of cols) {
     const ns = c.split('.').slice(0, 2).reverse().join('.');
@@ -702,8 +665,6 @@ function recordCard(handle, rec) {
   );
 }
 
-// ---- identity ------------------------------------------------------------------------------
-
 async function identityView(handle, snapshot, m) {
   const id = await api(`/api/snapshot/${handle}/${snapshot}/identity`);
   const services = id.didDocument?.service ?? [];
@@ -733,8 +694,6 @@ async function identityView(handle, snapshot, m) {
   );
 }
 
-// ---- about --------------------------------------------------------------------------------
-
 function aboutView() {
   setNav('about');
   const item = (title, body) => cell({ class: 'stack' }, h('h3', { class: 'subtitle' }, title), h('p', {}, body));
@@ -751,8 +710,6 @@ function aboutView() {
   );
 }
 
-// ---- router -------------------------------------------------------------------------------
-
 async function route() {
   const [path, qs] = location.hash.replace(/^#/, '').split('?');
   const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
@@ -768,8 +725,6 @@ async function route() {
   }
 }
 
-// ---- theme toggle -------------------------------------------------------------------------
-
 const toggle = document.querySelector('.theme-toggle');
 const isDark = () => document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
 const syncToggle = () => (toggle.querySelector('.theme-label').textContent = isDark() ? 'night' : 'day');
@@ -781,7 +736,6 @@ toggle.addEventListener('click', () => {
 });
 syncToggle();
 
-/** The hash minus the time-window param: switching windows keeps your scroll position, anything else starts at the top. */
 const placeKey = () => {
   const [path, qs] = location.hash.split('?');
   const q = new URLSearchParams(qs ?? '');

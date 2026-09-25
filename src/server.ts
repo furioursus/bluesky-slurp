@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-/**
- * Local web UI: serves web/ and a small JSON + SSE API over the same engine the CLI uses.
- * Binds to 127.0.0.1 only: it writes to disk and can spend Claude credits.
- */
 import { createReadStream, existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -39,8 +35,6 @@ const TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
 };
 
-// ---- jobs -------------------------------------------------------------
-
 type JobEvent = { type: 'log' | 'estimate' | 'done' | 'error'; data: unknown };
 
 interface Job {
@@ -48,7 +42,6 @@ interface Job {
   events: JobEvent[];
   listeners: Set<ServerResponse>;
   finished: boolean;
-  /** set while a tone estimate is waiting for the user's answer */
   answer?: (yes: boolean) => void;
 }
 
@@ -67,7 +60,6 @@ function emit(job: Job, type: JobEvent['type'], data: unknown) {
 
 interface JobRequest {
   mode: 'archive' | 'analyze';
-  /** handle/DID for archive; handle (account dir) for analyze */
   input: string;
   snapshot?: string;
   media?: boolean;
@@ -115,12 +107,9 @@ function startJob(req: JobRequest): Job {
     emit(job, 'done', { handle: parts.at(-3), snapshot: parts.at(-1) });
   })().catch((err) => emit(job, 'error', String(err?.message ?? err)));
 
-  // drop finished jobs after an hour
   setTimeout(() => jobs.delete(job.id), 60 * 60_000).unref();
   return job;
 }
-
-// ---- archive reading ----------------------------------------------------
 
 function snapshotDir(handle: string, snapshot: string): string | null {
   if (!SAFE.test(handle) || !SAFE.test(snapshot)) return null;
@@ -176,11 +165,10 @@ async function readRecords(dir: string, collection: string, offset: number, limi
   const file = join(dir, 'records', `${collection}.jsonl`);
   if (!existsSync(file)) return null;
   const lines = (await readFile(file, 'utf8')).split('\n').filter(Boolean);
-  if (order === 'newest') lines.reverse(); // files are rkey order, which is chronological for TIDs
+  // see docs/archive-format.md#record-order
+  if (order === 'newest') lines.reverse();
   return { total: lines.length, records: lines.slice(offset, offset + limit).map((l) => JSON.parse(l)) };
 }
-
-// ---- http -------------------------------------------------------------
 
 function send(res: ServerResponse, status: number, body: unknown) {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
@@ -200,7 +188,6 @@ async function serveFile(res: ServerResponse, path: string) {
   try {
     const s = await stat(path);
     if (!s.isFile()) throw new Error();
-    // no-cache = revalidate every load, so UI edits show up on a plain reload
     res.writeHead(200, { 'content-type': TYPES[extname(path)] ?? 'application/octet-stream', 'content-length': s.size, 'cache-control': 'no-cache' });
     createReadStream(path).pipe(res);
   } catch {
@@ -209,23 +196,20 @@ async function serveFile(res: ServerResponse, path: string) {
 }
 
 const server = createServer(async (req, res) => {
-  // same-origin only: reject cross-site form posts / fetches aimed at this local server
   const origin = req.headers.origin;
+  // see docs/web-ui.md#security
   if (req.method !== 'GET' && origin && origin !== `http://${req.headers.host}`) return send(res, 403, { error: 'cross-origin' });
 
   const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
   const parts = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
 
   try {
-    // GET /api/accounts
     if (req.method === 'GET' && url.pathname === '/api/accounts') return send(res, 200, await listAccounts());
 
-    // GET /api/config
     if (req.method === 'GET' && url.pathname === '/api/config') {
       return send(res, 200, { defaultModel: DEFAULT_MODEL, hasApiKey: !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN) });
     }
 
-    // GET /api/snapshot/:handle/:snapshot[/analysis|/tone|/identity|/records/:collection]
     if (req.method === 'GET' && parts[0] === 'api' && parts[1] === 'snapshot') {
       const dir = snapshotDir(parts[2] ?? '', parts[3] ?? '');
       if (!dir || !existsSync(dir)) return send(res, 404, { error: 'no such snapshot' });
@@ -253,13 +237,11 @@ const server = createServer(async (req, res) => {
       return send(res, 404, { error: 'not found' });
     }
 
-    // GET /blobs/:handle/:file
     if (req.method === 'GET' && parts[0] === 'blobs' && parts.length === 3) {
       if (!SAFE.test(parts[1]) || !SAFE.test(parts[2])) return send(res, 400, { error: 'bad path' });
       return serveFile(res, join(ROOT, parts[1], 'blobs', parts[2]));
     }
 
-    // POST /api/jobs
     if (req.method === 'POST' && url.pathname === '/api/jobs') {
       const b = await body(req);
       if (!['archive', 'analyze'].includes(b.mode) || typeof b.input !== 'string' || !b.input.trim()) {
@@ -268,7 +250,6 @@ const server = createServer(async (req, res) => {
       return send(res, 202, { id: startJob({ ...b, input: b.input.trim() }).id });
     }
 
-    // GET /api/jobs/:id/events  (SSE; replays history, then streams)
     if (req.method === 'GET' && parts[0] === 'api' && parts[1] === 'jobs' && parts[3] === 'events') {
       const job = jobs.get(parts[2]);
       if (!job) return send(res, 404, { error: 'no such job' });
@@ -280,7 +261,6 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // POST /api/jobs/:id/confirm  { yes: boolean }
     if (req.method === 'POST' && parts[0] === 'api' && parts[1] === 'jobs' && parts[3] === 'confirm') {
       const job = jobs.get(parts[2]);
       if (!job?.answer) return send(res, 409, { error: 'nothing waiting for confirmation' });
@@ -288,7 +268,6 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { ok: true });
     }
 
-    // static
     if (req.method === 'GET' && !url.pathname.startsWith('/api/')) {
       const rel = url.pathname === '/' ? 'index.html' : url.pathname.slice(1);
       const path = resolve(WEB, rel);
@@ -301,6 +280,7 @@ const server = createServer(async (req, res) => {
   }
 });
 
+// see docs/web-ui.md#security
 server.listen(Number(values.port), '127.0.0.1', () => {
   process.stderr.write(`slurp UI → http://127.0.0.1:${values.port}  (archives: ${ROOT})\n`);
 });
