@@ -75,8 +75,18 @@ src/
 - **One line, never two:** a grid nested inside a cell drops its own bottom border (`.cell .grid`), since the outer grid already draws that edge. Nested content that needs lines should be full-bleed cells in the same grid, not a grid floating inside padding. A 2-column grid with an odd number of cells stretches the last one across the row, so the ink background never shows through as a black block.
 - **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference. `body` has bottom padding so the last row can always scroll clear of it, after it was found covering the Proceed button.
 - **Theme before paint:** an inline script in `Base.astro` applies the saved theme before first paint so night mode doesn't flash white.
-- **Scroll:** time-window tabs are full page loads, and `Tabs` with `keepScroll` restores the scroll position after the switch. Any other navigation starts at the top.
+- **Scroll:** see [Scroll](#scroll).
 - **Stale styles in dev:** after editing a component's `<style>`, Astro's dev server has been seen serving the old CSS on full page loads while the file watcher reports the change. If a style edit seems to do nothing, restart `npm run dev` before debugging the CSS.
+
+## Scroll
+
+**TL;DR:** pages are full loads, so scroll resets by default. Links inside a `data-keep-scroll` container (the collections list and the time-window tabs) keep your place instead: `ScrollKeeper` (in `Base`) saves the page's scroll and every `data-scroll-id` pane's inner scroll on click, then restores them when the next page is the one you clicked.
+
+- **Scoped to the clicked target:** the saved position is keyed to the link's path and query and is removed as soon as the next page reads it. A stale save can't hijack a later, unrelated navigation.
+- **Deliberately not kept:** the pager and the account tabs (Report / Records / Identity). A new page of records or a different section should start at the top.
+- **Ignored clicks:** modifier or middle clicks (new tab) and links to other origins.
+- **Adding it elsewhere:** put `data-keep-scroll` on the link container, and `data-scroll-id="<name>"` on any inner scrolling pane that should keep its own position.
+- **Verified:** `feed.like` → `feed.repost` → `feed.like` kept the page at 480px and the collections list at 120px each time. A window-tab switch kept 900px. The pager went to the top with nothing left in storage.
 
 ## Masthead
 

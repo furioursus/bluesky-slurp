@@ -16,20 +16,6 @@ const { label, items, keepScroll = false } = Astro.props;
   </nav>
 </Grid>
 
-<script>
-  const KEY = 'slurp-scroll';
-  const saved = sessionStorage.getItem(KEY);
-  if (saved) {
-    sessionStorage.removeItem(KEY);
-    window.scrollTo(0, Number(saved));
-  }
-  for (const nav of document.querySelectorAll<HTMLElement>('nav[data-keep-scroll]')) {
-    nav.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).closest('a')) sessionStorage.setItem(KEY, String(window.scrollY));
-    });
-  }
-</script>
-
 <style>
   .tabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--line); background: var(--ink); padding: 0; }
   a { background: var(--paper); display: grid; place-items: center; min-height: var(--control); padding: var(--space-xs); text-align: center; text-decoration: none; text-transform: uppercase; letter-spacing: var(--track); }

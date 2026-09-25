@@ -19,7 +19,7 @@ for (const [c, n] of Object.entries(counts)) {
   <h2 class="subtitle">Collections</h2>
   <p class="muted">{Object.keys(counts).length} across {groups.size} apps</p>
 </div>
-<ul class="collections">
+<ul class="collections" data-keep-scroll data-scroll-id="collections">
   {
     [...groups].map(([ns, items]) => (
       <>

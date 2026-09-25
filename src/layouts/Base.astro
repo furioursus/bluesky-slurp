@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import Masthead from '../components/Masthead.astro';
+import ScrollKeeper from '../components/ScrollKeeper.astro';
 import ThemeToggle from '../components/ThemeToggle.astro';
 
 interface Props {
@@ -29,5 +30,6 @@ const { title, nav } = Astro.props;
     <Masthead current={nav} />
     <main id="view"><slot /></main>
     <ThemeToggle />
+    <ScrollKeeper />
   </body>
 </html>

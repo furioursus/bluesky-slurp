@@ -1,0 +1,29 @@
+<script>
+  const KEY = 'slurp-keep-scroll';
+  type Saved = { href: string; y: number; panes: Record<string, number> };
+
+  // see docs/web-ui.md#scroll
+  try {
+    const saved: Saved | null = JSON.parse(sessionStorage.getItem(KEY) ?? 'null');
+    sessionStorage.removeItem(KEY);
+    if (saved && saved.href === location.pathname + location.search) {
+      for (const [id, top] of Object.entries(saved.panes)) {
+        const pane = document.querySelector<HTMLElement>(`[data-scroll-id="${id}"]`);
+        if (pane) pane.scrollTop = top;
+      }
+      window.scrollTo(0, saved.y);
+    }
+  } catch {}
+
+  document.addEventListener('click', (e) => {
+    const link = (e.target as HTMLElement).closest<HTMLAnchorElement>('[data-keep-scroll] a[href]');
+    if (!link || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const url = new URL(link.href, location.href);
+    if (url.origin !== location.origin) return;
+    const panes: Record<string, number> = {};
+    for (const pane of document.querySelectorAll<HTMLElement>('[data-scroll-id]')) panes[pane.dataset.scrollId!] = pane.scrollTop;
+    try {
+      sessionStorage.setItem(KEY, JSON.stringify({ href: url.pathname + url.search, y: window.scrollY, panes }));
+    } catch {}
+  });
+</script>
