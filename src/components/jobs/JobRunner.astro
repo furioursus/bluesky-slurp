@@ -46,6 +46,8 @@ const { mode, input, snapshot, after } = Astro.props;
 
   type JobEvent = { type: 'log' | 'estimate' | 'done' | 'error'; data: any };
 
+  const AUTO_RELOAD_MS = 600;
+
   class JobRunner extends HTMLElement {
     connectedCallback() {
       this.querySelector('form')?.addEventListener('submit', (e) => this.start(e as SubmitEvent));
@@ -97,11 +99,15 @@ const { mode, input, snapshot, after } = Astro.props;
       }
       status('running');
 
+      let paid = false;
       const events = new EventSource(`/api/jobs/${body.id}/events`);
       events.onmessage = (msg) => {
         const ev: JobEvent = JSON.parse(msg.data);
         if (ev.type === 'log') append(ev.data);
-        if (ev.type === 'estimate') this.showEstimate(panel, body.id, ev.data, status);
+        if (ev.type === 'estimate') {
+          paid = true;
+          this.showEstimate(panel, body.id, ev.data, status);
+        }
         if (ev.type === 'error') {
           append(`error: ${ev.data}`);
           status('failed');
@@ -118,10 +124,13 @@ const { mode, input, snapshot, after } = Astro.props;
             open.href = `/a/${ev.data.handle}/${ev.data.snapshot}/report`;
             open.textContent = `Open ${ev.data.handle}`;
             open.hidden = false;
-          } else {
+          } else if (paid) {
             const reload = $('[data-reload]');
             reload.hidden = false;
             reload.addEventListener('click', () => location.reload());
+          } else {
+            status('done, reloading');
+            setTimeout(() => location.reload(), AUTO_RELOAD_MS);
           }
         }
       };

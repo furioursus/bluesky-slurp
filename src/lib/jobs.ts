@@ -72,6 +72,7 @@ export function startJob(req: JobRequest): Job {
       log('analyzing…');
       snapDir = await runAnalyze(target, ARCHIVE_ROOT, tone, log);
     }
+    log(req.mode === 'archive' && !req.analyze && !req.tone ? '✓ archived' : '✓ report updated');
     const parts = snapDir.split(sep);
     emit(job, 'done', { handle: parts.at(-3), snapshot: parts.at(-1) });
   })().catch((err) => emit(job, 'error', String(err?.message ?? err)));
