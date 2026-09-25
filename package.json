@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Archive an atproto account's public activity",
   "scripts": {
-    "slurp": "node src/cli.ts",
+    "slurp": "node --env-file-if-exists=.env src/cli.ts",
     "typecheck": "tsc --noEmit"
   },
   "type": "module",
