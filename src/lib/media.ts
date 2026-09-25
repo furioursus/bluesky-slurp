@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { blobFileName, downloadBlobs, writeJson } from './archive.ts';
 import { xrpc } from './http.ts';
 import type { Ref } from './refs.ts';
+import { recordLinks, type SourceLink } from './sources.ts';
 
 export type MediaKind = 'image' | 'video' | 'other';
 
@@ -17,6 +18,7 @@ export interface MediaUse {
   alt: string | null;
   text: string | null;
   labels: string[];
+  links: SourceLink[];
 }
 
 export interface MediaItem {
@@ -29,7 +31,7 @@ export interface MediaItem {
 }
 
 const INDEX_FILE = 'media-index.json';
-const INDEX_VERSION = 1;
+const INDEX_VERSION = 3;
 
 export const accountDirOf = (snapDir: string) => join(snapDir, '..', '..');
 export const blobDirOf = (snapDir: string) => join(accountDirOf(snapDir), 'blobs');
@@ -76,6 +78,7 @@ async function buildIndex(snapDir: string): Promise<MediaItem[]> {
           alt: altFor(r, ref.path),
           text: [r.text, r.description, r.displayName].find((v) => typeof v === 'string' && v.trim()) ?? null,
           labels: (r.labels?.values ?? []).map((l: any) => l.val).filter((v: string) => !v.startsWith('!')),
+          links: recordLinks(line.collection, r),
         });
         if (line.createdAt && (!item.at || line.createdAt > item.at)) item.at = line.createdAt;
         items.set(ref.target, item);

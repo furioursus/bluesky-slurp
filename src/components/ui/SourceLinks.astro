@@ -1,0 +1,34 @@
+---
+import { sourceLinks, type RecordRef, type SourceLink } from '../../lib/sources.ts';
+import Ext from './Ext.astro';
+
+interface Props {
+  record: RecordRef;
+  handle: string | null;
+  fromRecord?: SourceLink[];
+}
+
+const { record, handle, fromRecord = [] } = Astro.props;
+const links = sourceLinks(record, handle, fromRecord);
+const title: Record<string, string | undefined> = {
+  record: 'This URL is stored in the record itself',
+  verified: 'Checked against a real page',
+  estimated: 'Estimated URL pattern; may not resolve',
+  raw: 'Raw record in pdsls.dev',
+};
+---
+
+<span class="links">
+  {
+    links.map((l, i) => (
+      <>
+        {i > 0 && ' · '}
+        <span title={title[l.kind]}>{l.kind === 'estimated' && '≈ '}<Ext href={l.url}>{l.label} ↗</Ext></span>
+      </>
+    ))
+  }
+</span>
+
+<style>
+  .links { overflow-wrap: anywhere; }
+</style>

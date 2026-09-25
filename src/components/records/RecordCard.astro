@@ -3,7 +3,8 @@ import type { PostView } from '../../lib/appview.ts';
 import type { RecordLine } from '../../lib/archives.ts';
 import { when } from '../../lib/format.ts';
 import { EMBED_KICKER, embedTargets } from '../../lib/ui.ts';
-import Ext from '../ui/Ext.astro';
+import { recordLinks } from '../../lib/sources.ts';
+import SourceLinks from '../ui/SourceLinks.astro';
 import MediaThumbs from './MediaThumbs.astro';
 import PostEmbed from './PostEmbed.astro';
 import RefList from './RefList.astro';
@@ -15,9 +16,10 @@ interface Props {
   handles: Map<string, string | null | undefined>;
   showRoots: boolean;
   localFiles: Set<string>;
+  accountHandle: string | null;
 }
 
-const { handle, rec, posts, handles, showRoots, localFiles } = Astro.props;
+const { handle, rec, posts, handles, showRoots, localFiles, accountHandle } = Astro.props;
 const r = rec.record;
 const text = [r.text, r.description, r.displayName].find((v) => typeof v === 'string') ?? null;
 const media = rec.refs.filter((x) => x.kind === 'blob');
@@ -27,7 +29,7 @@ const pointers = rec.refs.filter((x) => x.kind !== 'blob');
 <article class="record">
   <div class="head">
     <span><strong>{when(rec.createdAt)}</strong> <span class="mono muted">{rec.rkey}</span></span>
-    <Ext href={rec.web}>Open ↗</Ext>
+    <SourceLinks record={rec} handle={accountHandle} fromRecord={recordLinks(rec.collection, r)} />
   </div>
   {text && <p class="text">{text}</p>}
   {pointers.length > 0 && <RefList refs={pointers} handles={handles} />}

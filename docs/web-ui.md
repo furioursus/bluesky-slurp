@@ -95,6 +95,37 @@ src/
 - **Empty filters:** the current type tab always shows, even at 0, and an empty result says what matched nothing, with links to widen it. The wall isn't rendered when there are no tiles, which avoids a doubled rule.
 - **Tiles:** `repeat(auto-fill, minmax(--tile, 1fr))` with per-tile right and bottom borders, clipped by the wall's `overflow: hidden`, so a partial last row doesn't leave ink blocks the way the `gap` hairline trick would.
 
+## Source links
+
+**TL;DR:** wherever a record is shown (Records tab, media "Used in"), it links back to where it lives: first any URL the record itself carries, then the app's own page from a pattern registry (`src/lib/sources.ts`), then always the raw record on pdsls.dev. Each link says how it was established: stored in the record, verified against a real page, or estimated (`≈`).
+
+| kind | shown as | meaning |
+|---|---|---|
+| `record` | host name, e.g. `furioursus.pckt.blog ↗` | a URL stored in the record (`url`, `originUrl`, `website`; Bluesky status → its linked stream) |
+| `verified` | app name, e.g. `Popfeed ↗` | the pattern was opened for a real record and the page was specific to it |
+| `estimated` | `≈ Rocksky ↗` | from source code, docs, or analogy. May not resolve |
+| `raw` | `Record ↗` | pdsls.dev record viewer, always last, so a wrong guess is never a dead end |
+
+| app | pattern | confidence |
+|---|---|---|
+| Bluesky | posts, feeds, lists, starter packs, profiles (via `webUrlForUri`); status → profile | verified |
+| Popfeed | `/profile/{handle}`, `/review/at:/{did}/…/{rkey}`, `/list/at:/{did}/…/{rkey}`; list item → its list (from `listUri`) | verified (browser; the site is client-rendered) |
+| Currents | `/profile/{handle}`, `/profile/{handle}/save/{rkey}` | verified |
+| Grain | `/profile/{handle}` · galleries `/profile/{handle}/gallery/{rkey}` | verified · estimated (from their route tree) |
+| atmoBB | `/members/{handle}`; thread → its board `/b/{board rkey}` (from `board`) | verified. Thread URLs need the board and title slugs, and made-up slugs return a 500 |
+| Tangled | `tangled.org/{handle}`, `/{handle}/{rkey}` for repos | verified (tangled.sh redirects here; `/@handle` redirects to `/handle`) |
+| Rocksky | `/profile/{handle}` · `/{did}/{song,scrobble,album,artist}/{rkey}` | verified · estimated |
+| Sifa | `sifa.id/p/{handle}` | verified |
+| WhiteWind | `/{handle}`, `/{handle}/{rkey}` | verified |
+| Frontpage | `/profile/{handle}` | verified |
+| Flushes | `flushes.app/profile/{handle}` | verified |
+| Smoke Signal, Linkat | `smokesignal.events/{did}/{rkey}`, `linkat.blue/{handle}` | estimated |
+| teal.fm, Streamplace, Anisota, bsky38 | none: no public per-user or per-record pages found | record viewer only |
+
+- **Profile fallback:** a record with no page of its own, in an app with a known profile page, links to the profile as "`<App>` profile". That's skipped when the record already links to its own place in the app (a Popfeed list item, an atmoBB thread).
+- **Researched 2026-09-25**, spot-checked by page title against `furioursus.dev`'s real records. Apps change routes, so re-check before trusting an old "verified".
+- **Adding an app:** add an entry under its NSID namespace (first two segments) in `APPS`, with `verified(...)` only after opening the URL for a real record and seeing that record's content. For links that need data from the record, add a `RECORD_DERIVED` entry. Media uses store record links in `media-index.json`, so bump `INDEX_VERSION` in `src/lib/media.ts` when those change.
+
 ## Scroll
 
 **TL;DR:** `ClientRouter` scrolls to the top after every page swap. Links inside a `data-keep-scroll` container (the collections list and the time-window tabs) keep your place instead. `src/lib/scroll.ts` captures the page's scroll plus every `data-scroll-id` pane's inner scroll when you click such a link, then restores it in `astro:after-swap`, before the browser paints.

@@ -46,7 +46,7 @@ const href = (o: number, ord: 'newest' | 'oldest' = order) => `${base}/${collect
         {collection === POSTS && <RootsToggle checked={showRoots} />}
         {page && <Pager href={href} offset={offset} limit={PAGE} total={page.total} order={order} />}
       </Cell>
-      {records.map((rec) => <RecordCard handle={handle} rec={rec} posts={posts} handles={handles} showRoots={showRoots} localFiles={localFiles} />)}
+      {records.map((rec) => <RecordCard handle={handle} rec={rec} posts={posts} handles={handles} showRoots={showRoots} localFiles={localFiles} accountHandle={snap?.manifest.handle ?? null} />)}
       {page && records.length > 5 && <Cell><Pager href={href} offset={offset} limit={PAGE} total={page.total} order={order} /></Cell>}
     </Cell>
   </Grid>

@@ -5,6 +5,7 @@ import EmptyState from '../../../../../components/ui/EmptyState.astro';
 import Ext from '../../../../../components/ui/Ext.astro';
 import Grid from '../../../../../components/ui/Grid.astro';
 import Section from '../../../../../components/ui/Section.astro';
+import SourceLinks from '../../../../../components/ui/SourceLinks.astro';
 import AccountLayout from '../../../../../layouts/AccountLayout.astro';
 import { loadSnapshot } from '../../../../../lib/archives.ts';
 import { fmt, plural, when } from '../../../../../lib/format.ts';
@@ -77,7 +78,7 @@ const alts = item ? [...new Set(item.uses.map((u) => u.alt).filter(Boolean))] : 
                     <span class="mono muted">{sourceLabel(u.collection)}</span>
                     {u.text && <span class="use-text">{u.text}</span>}
                   </span>
-                  <span class="count">{when(u.createdAt)} · <Ext href={u.web}>Open ↗</Ext></span>
+                  <span class="count">{when(u.createdAt)} · <SourceLinks record={u} handle={snap?.manifest.handle ?? null} fromRecord={u.links ?? []} /></span>
                 </li>
               ))}
             </ol>
