@@ -1,6 +1,5 @@
 export const fmt = (n: number | null | undefined) => (n == null ? '—' : Number(n).toLocaleString('en-US'));
 export const pct = (n: number | null | undefined) => (n == null ? '—' : `${n}%`);
-export const money = (n: number | null | undefined) => (n == null ? null : `$${n.toFixed(n < 1 ? 3 : 2)}`);
 export const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : '—');
 
 export const when = (iso: string | null | undefined) =>

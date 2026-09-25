@@ -3,7 +3,6 @@ import Cell from '../ui/Cell.astro';
 import Check from '../ui/Check.astro';
 import Grid from '../ui/Grid.astro';
 import JobRunner from './JobRunner.astro';
-import ToneControls from './ToneControls.astro';
 ---
 
 <JobRunner mode="archive" after="open">
@@ -22,7 +21,6 @@ import ToneControls from './ToneControls.astro';
           <Check name="media" title="Media" note="Download images and video. Can be gigabytes." />
           <Check name="analyze" title="Analyze" note="Behavior and interests report. Free, offline." checked />
         </div>
-        <ToneControls />
       </Cell>
     </Grid>
     <Grid><Cell flush><button class="cta" type="submit"><span>Slurp it</span></button></Cell></Grid>

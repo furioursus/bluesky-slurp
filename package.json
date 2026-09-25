@@ -13,7 +13,6 @@
   },
   "type": "module",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
     "@astrojs/node": "^11.1.6",
     "@atcute/repo": "^1.1.0",
     "astro": "^7.3.5"

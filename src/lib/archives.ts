@@ -27,7 +27,6 @@ export interface SnapshotSummary {
   collections: number;
   media: boolean;
   analysis: boolean;
-  tone: boolean;
 }
 
 export interface AccountSummary {
@@ -79,7 +78,6 @@ export async function listAccounts(): Promise<AccountSummary[]> {
         collections: Object.keys(m.counts).length,
         media: m.media?.enabled ?? false,
         analysis: existsSync(join(dir, 'analysis.json')),
-        tone: existsSync(join(dir, 'tone.json')),
       });
     }
     if (!snapshots.length) continue;
@@ -123,4 +121,3 @@ export async function readRecords(dir: string, collection: string, offset: numbe
   return { total: lines.length, records: lines.slice(offset, offset + limit).map((l) => JSON.parse(l) as RecordLine) };
 }
 
-export const hasApiKey = () => !!(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);

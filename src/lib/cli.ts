@@ -2,22 +2,18 @@
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { archiveAccount } from './archive.ts';
-import { DEFAULT_MODEL, resolveSnapshot, runAnalyze } from './analyze.ts';
+import { resolveSnapshot, runAnalyze } from './analyze.ts';
 import { downloadSnapshotMedia } from './media.ts';
 
 const HELP = `slurp — archive everything an atproto account has publicly put on the network
 
 usage: slurp <handle | did | bsky.app profile URL> [options]
-       slurp analyze <handle | snapshot dir> [--tone] [--out <dir>]
+       slurp analyze <handle | snapshot dir> [--out <dir>]
        slurp media <handle | snapshot dir> [--out <dir>]   download media for an existing snapshot
 
 options:
   --media        also download images, video and other blobs (off by default)
   --analyze      write analysis.md / analysis.json into the snapshot after archiving
-  --tone         add a Claude tone pass to the analysis (shows a token/cost estimate and asks first)
-  --model <id>   model for the tone pass (default: ${DEFAULT_MODEL})
-  --tone-limit <n>  max posts to label: 75% most recent cold, 25% warm baseline (default: 200)
-  -y, --yes      skip the tone-pass confirmation
   --out <dir>    archive root (default: ./archives)
   -h, --help     show this help
 
@@ -31,17 +27,12 @@ async function main() {
     options: {
       media: { type: 'boolean', default: false },
       analyze: { type: 'boolean', default: false },
-      tone: { type: 'boolean', default: false },
-      model: { type: 'string', default: DEFAULT_MODEL },
-      'tone-limit': { type: 'string', default: '200' },
-      yes: { type: 'boolean', short: 'y', default: false },
       out: { type: 'string', default: 'archives' },
       help: { type: 'boolean', short: 'h', default: false },
     },
   });
-  const tone = values.tone ? { model: values.model!, limit: Number(values['tone-limit']), yes: values.yes! } : undefined;
   if (positionals[0] === 'analyze' && positionals.length === 2) {
-    const snap = await runAnalyze(positionals[1], values.out!, tone, log);
+    const snap = await runAnalyze(positionals[1], values.out!);
     log(`analysis → ${join(snap, 'analysis.md')}`);
     return;
   }
@@ -56,9 +47,9 @@ async function main() {
     process.exit(values.help ? 0 : 1);
   }
   const { snapDir } = await archiveAccount(positionals[0], { media: values.media!, out: values.out! }, log);
-  if (values.analyze || values.tone) {
+  if (values.analyze) {
     log('analyzing…');
-    await runAnalyze(snapDir, values.out!, tone, log);
+    await runAnalyze(snapDir, values.out!);
   }
   log(`done → ${snapDir}`);
 }

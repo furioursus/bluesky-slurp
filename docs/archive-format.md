@@ -17,7 +17,6 @@ archives/<handle>/
     identity/plc-audit-log.json
     bsky-profile.json
     analysis.json / analysis.md
-    tone.json
     media-index.json
 ```
 

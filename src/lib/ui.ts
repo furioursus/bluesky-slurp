@@ -1,8 +1,5 @@
 import type { Ref } from './refs.ts';
-import type { Label } from './tone.ts';
 
-export const MODELS = ['claude-sonnet-5', 'claude-opus-5', 'claude-haiku-4-5', 'claude-opus-5-5', 'claude-fable-5-1'];
-export const BAD_FAITH = new Set<Label>(['argumentative', 'hostile', 'trolling']);
 export const SENSITIVE = new Set(['porn', 'sexual', 'nudity', 'graphic-media', 'gore']);
 export const WINDOW_TABS: Record<string, string> = { '30d': '30 days', '90d': '3 months', '180d': '6 months', '365d': '1 year', all: 'All time' };
 export const EMBED_KICKER: Record<string, string> = { 'reply-root': 'Thread root', 'reply-parent': 'Replying to', liked: 'Liked post', reposted: 'Reposted post' };

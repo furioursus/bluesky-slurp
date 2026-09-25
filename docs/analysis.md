@@ -35,14 +35,6 @@
 
 **TL;DR:** a percentage with no denominator is `null`, never `0`. "No data" must never read as "0%, nothing wrong here".
 
-- `pct()` in analysis and `pctBadFaith` in tone summaries both return `null` for an empty sample.
+- `pct()` returns `null` for an empty sample.
 - The UI and Markdown branch on sample sizes (`total`), not on the percentage, and say "no warm posts sampled" rather than printing a number.
-- The original bug: a tone stat rendered as `13.3/0`, which reads as a division by zero, and would have shown a false 0% for an empty side.
-
-## Tone coverage
-
-**TL;DR:** tone labels only exist for the sampled posts (most recent first), so windows that reach back past the sample show the sample's numbers and say so.
-
-- `toneCoverage` in `analysis.json` records the date range the labels actually span.
-- A window is "sample-limited" when its start is earlier than `toneCoverage.from`. The UI flags it instead of implying the labels cover the whole window.
-- See [tone-pass.md](tone-pass.md#sampling) for how the sample is chosen.
+- The original bug (in the since-retired tone stat): `13.3/0`, which reads as a division by zero and would have shown a false 0% for an empty side.

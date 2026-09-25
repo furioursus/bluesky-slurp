@@ -8,18 +8,18 @@
 
 ```
 src/
-  lib/            engine (archive, analyze, tone, refs, identity, http, media, cli) + UI helpers (archives, jobs, appview, format, ui, scroll, media-view)
+  lib/            engine (archive, analyze, refs, identity, http, media, cli) + UI helpers (archives, jobs, appview, format, ui, scroll, media-view)
   middleware.ts   same-origin check for non-GET requests
   layouts/        Base (html shell, ClientRouter, masthead, theme toggle, scroll keeper) · AccountLayout (header + tabs, 404 when not archived)
   components/
     ui/           Grid · Cell · Section · Stat · Tabs · Check · Ext · People · Chips · EmptyState
-    jobs/         JobRunner (the only real island) · ArchiveForm · ToneControls · AnalysisActions · NoReport · UpgradeReport
-    report/       HeadlineStats · ToneStat · ShapeSection · HoursChart · TargetingSection · ToneSection · InterestsSection
+    jobs/         JobRunner (the only real island) · ArchiveForm · AnalysisActions · NoReport · UpgradeReport
+    report/       HeadlineStats · ShapeSection · HoursChart · TargetingSection · InterestsSection
     records/      CollectionList · Pager · RootsToggle · RecordCard · RefList · PostEmbed · EmbedMedia · MediaThumbs
     media/        MediaWall · MediaFilters · MediaDownload · MediaViewer
     account/      AccountHeader · AccountGrid
   pages/          / · /accounts · /about · /a/[handle] · /a/[handle]/[snapshot]/{report,records/[...collection],media,media/[cid],identity}
-                  /blobs/[handle]/[file] · /api/jobs · /api/jobs/[id]/events · /api/jobs/[id]/confirm
+                  /blobs/[handle]/[file] · /api/jobs · /api/jobs/[id]/events
   styles/         global.css (tokens + primitives) · media.css (the one breakpoint)
 ```
 
@@ -28,32 +28,30 @@ src/
 
 ## Security
 
-**TL;DR:** it binds to `127.0.0.1` (Astro `server.host`, plus `HOST` in `npm run serve`), middleware rejects cross-origin non-GET requests, path segments are allowlisted, and the API key stays server-side. The server writes to disk and can spend Claude credits, so nothing outside this machine may reach it.
+**TL;DR:** it binds to `127.0.0.1` (Astro `server.host`, plus `HOST` in `npm run serve`), middleware rejects cross-origin non-GET requests, path segments are allowlisted. The server writes to disk and runs jobs, so nothing outside this machine may reach it.
 
 - **Bind address:** `127.0.0.1`, never `0.0.0.0`. Exposing it remotely needs real auth in front (see the parked Cloudflare Access plan in project memory), not a flag flip.
 - **Origin check:** `src/middleware.ts` returns 403 for any non-GET request whose `Origin` host doesn't match the request host. This stops a malicious page from POSTing jobs here. It skips prerendered routes, which can't receive POSTs. Behind a tunnel this still holds, because it compares hosts rather than full origins.
 - **Paths:** handle, snapshot, collection and blob names must match `^[A-Za-z0-9._:-]+$` and resolve inside the archive root (`SAFE_NAME` in `src/lib/archives.ts`).
-- **API key:** `npm run dev` and `npm run serve` start Node with `--env-file-if-exists=.env`. Only server code reads the key, and the browser never sees it.
 
 ## Rendering untrusted text
 
 **TL;DR:** archived posts are attacker-controlled. Astro escapes every `{expression}`, so render record content only through expressions and never with `set:html`. Links go through `Ext` / `safeHref`, which allow only `http(s)`, `/` and `#`.
 
-- The one client script that writes archive-derived text (`JobRunner`'s log and estimate) uses `textContent` only.
+- The one client script that writes archive-derived text (`JobRunner`'s log) uses `textContent` only.
 
 ## Jobs
 
-**TL;DR:** `JobRunner` wraps a form. On submit it POSTs `/api/jobs`, clones a server-rendered `<template>` for the panel, and streams progress over SSE. When the tone step posts an estimate, it shows Proceed/Skip and POSTs the answer to `/api/jobs/[id]/confirm`.
+**TL;DR:** `JobRunner` wraps a form. On submit it POSTs `/api/jobs`, clones a server-rendered `<template>` for the panel, and streams progress over SSE.
 
 | route | purpose |
 |---|---|
-| `POST /api/jobs` | start `archive`, `analyze` or `media` (`{ mode, input, snapshot?, media?, analyze?, tone?, model?, toneLimit? }`) |
+| `POST /api/jobs` | start `archive`, `analyze` or `media` (`{ mode, input, snapshot?, media?, analyze? }`) |
 | `GET /api/jobs/:id/events` | SSE. Each event carries an `id`, and a reconnect with `Last-Event-ID` resumes rather than replaying |
-| `POST /api/jobs/:id/confirm` | answer a tone estimate `{ yes }` |
 | `GET /blobs/:handle/:file` | downloaded media; `?download` adds `content-disposition: attachment` |
 
 - Jobs live in memory in the server process and are dropped an hour after they start.
-- When a job finishes, the page refreshes through the router (`navigate(current URL, { history: 'replace' })`) and keeps your scroll position. Free re-runs refresh on their own; after a paid tone pass the "Show the report" button does it, so you can read the actual cost first.
+- When a job finishes, the page refreshes through the router (`navigate(current URL, { history: 'replace' })`) and keeps your scroll position. An archive job instead offers an "Open" link to the new snapshot.
 - Navigating away mid-job closes the panel's event stream (`disconnectedCallback`). The job itself keeps running on the server.
 - Astro allows one dev server per project. To test against another archive root, build and run `dist/server/entry.mjs` with `SLURP_ARCHIVES` and `PORT` set.
 

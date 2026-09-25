@@ -21,21 +21,8 @@ const { mode, input, snapshot, after } = Astro.props;
         </div>
         <pre class="log" aria-live="polite" data-log></pre>
       </div>
-      <div class="cell span-all flush" data-prompt hidden>
-        <div class="grid cols-4">
-          <div class="cell stack"><p class="kicker">Tone pass estimate</p><p class="big-number" data-cost></p></div>
-          <div class="cell stack"><p class="kicker">Input tokens (exact)</p><p class="big-number" data-input-tokens></p></div>
-          <div class="cell stack"><p class="kicker">Output tokens (range)</p><p class="subtitle" data-output-tokens></p></div>
-          <div class="cell stack"><p class="kicker" data-requests></p><p class="mono" data-model></p></div>
-          <div class="cell span-all btn-row">
-            <button class="btn solid" type="button" data-answer="yes">Proceed</button>
-            <button class="btn" type="button" data-answer="no">Skip tone pass</button>
-          </div>
-        </div>
-      </div>
       <div class="cell span-all" data-finish hidden>
         <a class="btn solid" data-open hidden></a>
-        <button class="btn solid" type="button" data-reload hidden>Show the report</button>
       </div>
     </section>
   </template>
@@ -43,10 +30,9 @@ const { mode, input, snapshot, after } = Astro.props;
 
 <script>
   import { navigate } from 'astro:transitions/client';
-  import { fmt, money, plural } from '../../lib/format.ts';
   import { keepScrollOnNextSwap } from '../../lib/scroll.ts';
 
-  type JobEvent = { type: 'log' | 'estimate' | 'done' | 'error'; data: any };
+  type JobEvent = { type: 'log' | 'done' | 'error'; data: any };
 
   const AUTO_RELOAD_MS = 600;
   const TITLES: Record<string, string> = { archive: 'Archiving', analyze: 'Analyzing', media: 'Downloading media for' };
@@ -71,7 +57,6 @@ const { mode, input, snapshot, after } = Astro.props;
       e.preventDefault();
       const form = e.target as HTMLFormElement;
       const fd = new FormData(form);
-      const submitter = e.submitter as HTMLButtonElement | null;
       const { mode, input, snapshot, after } = this.dataset;
       const request = {
         mode,
@@ -79,9 +64,6 @@ const { mode, input, snapshot, after } = Astro.props;
         snapshot,
         media: fd.has('media'),
         analyze: fd.has('analyze'),
-        tone: submitter?.name === 'tone' ? submitter.value === '1' : fd.has('tone'),
-        model: fd.get('model'),
-        toneLimit: Number(fd.get('toneLimit') ?? 200),
       };
       for (const b of form.querySelectorAll('button')) b.disabled = true;
 
@@ -113,15 +95,10 @@ const { mode, input, snapshot, after } = Astro.props;
       }
       status('running');
 
-      let paid = false;
       const events = (this.events = new EventSource(`/api/jobs/${body.id}/events`));
       events.onmessage = (msg) => {
         const ev: JobEvent = JSON.parse(msg.data);
         if (ev.type === 'log') append(ev.data);
-        if (ev.type === 'estimate') {
-          paid = true;
-          this.showEstimate(panel, body.id, ev.data, status);
-        }
         if (ev.type === 'error') {
           append(`error: ${ev.data}`);
           status('failed');
@@ -138,37 +115,12 @@ const { mode, input, snapshot, after } = Astro.props;
             open.href = `/a/${ev.data.handle}/${ev.data.snapshot}/report`;
             open.textContent = `Open ${ev.data.handle}`;
             open.hidden = false;
-          } else if (paid) {
-            const reload = $('[data-reload]');
-            reload.hidden = false;
-            reload.addEventListener('click', refresh);
           } else {
             status('done, reloading');
             setTimeout(refresh, AUTO_RELOAD_MS);
           }
         }
       };
-    }
-
-    showEstimate(panel: HTMLElement, id: string, e: any, status: (t: string) => void) {
-      const $ = (sel: string) => panel.querySelector<HTMLElement>(sel)!;
-      status('waiting for you');
-      $('[data-cost]').textContent = e.costLow == null ? 'no price on file' : `${money(e.costLow)} – ${money(e.costHigh)}`;
-      $('[data-input-tokens]').textContent = fmt(e.inputTokens);
-      $('[data-output-tokens]').textContent = `${fmt(e.outputLow)} – ${fmt(e.outputHigh)}`;
-      $('[data-requests]').textContent = `${plural(e.posts, 'post')} · ${plural(e.requests, 'request')}`;
-      $('[data-model]').textContent = e.model;
-      const prompt = $('[data-prompt]');
-      prompt.hidden = false;
-      for (const button of prompt.querySelectorAll<HTMLButtonElement>('[data-answer]')) {
-        button.onclick = async () => {
-          const yes = button.dataset.answer === 'yes';
-          prompt.hidden = true;
-          status(yes ? 'labelling' : 'finishing');
-          await fetch(`/api/jobs/${id}/confirm`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ yes }) });
-        };
-      }
-      prompt.querySelector<HTMLButtonElement>('[data-answer="yes"]')!.focus();
     }
   }
 

@@ -3,7 +3,6 @@ import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getJson, xrpc } from './http.ts';
 import { webUrlForDid } from './refs.ts';
-import { DEFAULT_MODEL, LABELS, runTone, summarizeTone, type ToneCandidate, type ToneOptions, type ToneResult } from './tone.ts';
 
 const DAY = 86_400_000;
 const EXAMPLES = 5;
@@ -40,7 +39,7 @@ export async function resolveSnapshot(pathOrHandle: string, out: string): Promis
     }
   }
   throw new Error(
-    `no snapshot found for ${pathOrHandle} (tried ${candidates.join(', ')}). Archive it first: slurp ${pathOrHandle} (add --tone to archive and analyze in one go)`,
+    `no snapshot found for ${pathOrHandle} (tried ${candidates.join(', ')}). Archive it first: slurp ${pathOrHandle} (add --analyze to archive and analyze in one go)`,
   );
 }
 
@@ -84,17 +83,6 @@ const top = (m: Map<string, number>, n: number) => [...m].sort((a, b) => b[1] - 
 const pct = (a: number, b: number): number | null => (b ? Math.round((a / b) * 1000) / 10 : null);
 const pc = (n: number | null) => (n == null ? 'n/a' : `${n}%`);
 
-export function toneSentence(t: { cold: { total: number; pctBadFaith: number | null }; warm: { total: number; pctBadFaith: number | null } }): string {
-  const { cold, warm } = t;
-  if (cold.total && warm.total) {
-    const thin = warm.total < 10 || cold.total < 10 ? ` Small sample (${cold.total} cold, ${warm.total} warm), so read the gap loosely.` : '';
-    return `${cold.pctBadFaith}% of cold replies/quotes read as bad faith, vs ${warm.pctBadFaith}% toward people they know.${thin}`;
-  }
-  if (cold.total) return `${cold.pctBadFaith}% of cold replies/quotes read as bad faith. None of the sampled posts were to people they know, so there's no baseline to compare against.`;
-  if (warm.total) return `${warm.pctBadFaith}% of replies to people they know read as bad faith. None of the sampled posts were cold, so there's nothing to compare.`;
-  return 'No replies or quotes were labelled.';
-}
-
 async function resolveHandles(dids: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   for (let i = 0; i < dids.length; i += 25) {
@@ -119,11 +107,6 @@ export const WINDOWS = [
 export type WindowKey = (typeof WINDOWS)[number]['key'];
 
 export async function analyze(snap: string) {
-  const { report } = await analyzeWithCandidates(snap);
-  return report;
-}
-
-async function analyzeWithCandidates(snap: string) {
   const manifest = JSON.parse(await readFile(join(snap, 'manifest.json'), 'utf8'));
   const self: string = manifest.did;
   const now = Date.parse(manifest.fetchedAt);
@@ -260,7 +243,6 @@ async function analyzeWithCandidates(snap: string) {
           strangerQuotes: stats.strangerQuotes,
         },
         interests: { ...stats.interests, mostLiked: ranked(stats.raw.liked), mostReposted: ranked(stats.raw.reposted) },
-        tone: null as ReturnType<typeof summarizeTone> | null,
       },
     ]),
   ) as Record<WindowKey, WindowReport>;
@@ -270,19 +252,6 @@ async function analyzeWithCandidates(snap: string) {
     const ns = col.split('.').slice(0, 2).reverse().join('.');
     apps.set(ns, (apps.get(ns) ?? 0) + n);
   }
-
-  const toneCandidates: ToneCandidate[] = posts
-    .filter((p) => p.target && p.targetUri && typeof p.line.record.text === 'string' && p.line.record.text.trim())
-    .map((p) => ({
-      uri: p.line.uri,
-      web: p.line.web,
-      kind: p.kind as 'reply' | 'quote',
-      text: p.line.record.text,
-      targetUri: p.targetUri!,
-      cold: isCold(p.target!),
-      followed: followed.has(p.target!),
-      at: p.at,
-    }));
 
   const firstAt = Math.min(...posts.map((p) => p.at).filter((n) => !Number.isNaN(n)));
 
@@ -298,9 +267,8 @@ async function analyzeWithCandidates(snap: string) {
     windows: WINDOWS.map((w) => w.key),
     byWindow,
     appsUsed: top(apps, 30).map(([app, records]) => ({ app, records })),
-    toneCoverage: null as { labelled: number; from: string; to: string } | null,
   };
-  return { report, candidates: toneCandidates };
+  return report;
 }
 
 export interface Person {
@@ -348,23 +316,9 @@ export interface WindowReport {
     mostLiked: Person[];
     mostReposted: Person[];
   };
-  tone: ReturnType<typeof summarizeTone> | null;
 }
 
 export type Report = Awaited<ReturnType<typeof analyze>>;
-
-function applyTone(report: Report, candidates: ToneCandidate[], results: Record<string, ToneResult>) {
-  const at = new Map(candidates.map((c) => [c.uri, c.at]));
-  const labelled = Object.keys(results).filter((u) => at.has(u));
-  if (!labelled.length) return;
-  const times = labelled.map((u) => at.get(u)!).filter((n) => !Number.isNaN(n));
-  report.toneCoverage = { labelled: labelled.length, from: new Date(Math.min(...times)).toISOString(), to: new Date(Math.max(...times)).toISOString() };
-  for (const w of Object.values(report.byWindow)) {
-    const since = w.since ? Date.parse(w.since) : -Infinity;
-    const inside = Object.fromEntries(labelled.filter((u) => at.get(u)! >= since).map((u) => [u, results[u]]));
-    w.tone = Object.keys(inside).length ? summarizeTone(inside) : null;
-  }
-}
 
 export function toMarkdown(r: Report): string {
   const all = r.byWindow.all;
@@ -372,7 +326,6 @@ export function toMarkdown(r: Report): string {
   const name = (p: { handle: string | null; did: string; web: string; followed: boolean }) =>
     `[${p.handle ?? p.did}](${p.web})${p.followed ? '' : ' · not followed'}`;
   const list = <T,>(items: T[], fmt: (t: T) => string) => (items.length ? items.map((i) => `- ${fmt(i)}`).join('\n') : '- none');
-  const t = all.tone;
   const windows = r.windows.map((k) => r.byWindow[k]);
 
   return `# Behavior report: ${r.account.handle ?? r.account.did}
@@ -383,11 +336,11 @@ export function toMarkdown(r: Report): string {
 
 ## Over time
 
-| window | posts | replies to others | quotes | cold share | reply bursts | stranger quotes | bad faith, cold / warm |
-|---|---|---|---|---|---|---|---|
-${windows.map((w) => `| ${w.label} | ${w.shape.posts} | ${pc(w.shape.pctRepliesToOthers)} | ${pc(w.shape.pctQuotes)} | ${pc(w.shape.pctOutwardToStrangers)} | ${w.targeting.replyBurstsAtNonFollowed.length} | ${w.targeting.strangerQuotes.count} | ${w.tone ? `${pc(w.tone.cold.pctBadFaith)} / ${pc(w.tone.warm.pctBadFaith)}` : 'n/a'} |`).join('\n')}
+| window | posts | replies to others | quotes | cold share | reply bursts | stranger quotes |
+|---|---|---|---|---|---|---|
+${windows.map((w) => `| ${w.label} | ${w.shape.posts} | ${pc(w.shape.pctRepliesToOthers)} | ${pc(w.shape.pctQuotes)} | ${pc(w.shape.pctOutwardToStrangers)} | ${w.targeting.replyBurstsAtNonFollowed.length} | ${w.targeting.strangerQuotes.count} |`).join('\n')}
 
-**Reading it:** a cold share or bad-faith rate that climbs as the window narrows means it's getting worse lately. Windows count back from the snapshot date. "Followed" and "cold" use relationships as of the snapshot.
+**Reading it:** a cold share, burst count or stranger-quote rate that climbs as the window narrows means it's getting worse lately. Windows count back from the snapshot date. "Followed" and "cold" use relationships as of the snapshot.
 
 ## Shape of engagement (all time)
 
@@ -432,46 +385,13 @@ ${list(all.interests.mostLiked, (p) => `${name(p)} — ${p.count}`)}
 
 **Most reposted**
 ${list(all.interests.mostReposted, (p) => `${name(p)} — ${p.count}`)}
-${t ? toneMarkdown(t, r.toneCoverage) : ''}`;
-}
-
-function toneMarkdown(t: NonNullable<WindowReport['tone']>, coverage: Report['toneCoverage']): string {
-  const row = (l: string) => `| ${l} | ${t.cold.counts[l]} | ${t.warm.counts[l]} |`;
-  const examples = LABELS.filter((l) => t.examples[l].length)
-    .map((l) => `**${l}**\n${t.examples[l].map((e) => `- [post](${e.web}) (${e.confidence}${e.cold ? ', cold' : ''}): ${e.reason}`).join('\n')}`)
-    .join('\n\n');
-  return `
-## Tone (Claude)
-
-**TL;DR:** ${toneSentence(t)} Bad faith = argumentative, hostile or trolling. A big gap between cold and warm is the tell. A high number on both is just how they talk.
-
-- ${t.labelled} posts labelled by ${t.model}${t.refused ? `, ${t.refused} without a label` : ''}${coverage ? `, covering ${coverage.from.slice(0, 10)} to ${coverage.to.slice(0, 10)}` : ''}. Every label is a model's reading of one post in context. Open the examples.
-
-| label | cold (${t.cold.total}) | warm (${t.warm.total}) |
-|---|---|---|
-${LABELS.map(row).join('\n')}
-
-${examples}
 `;
 }
 
-export async function runAnalyze(target: string, out: string, tone?: ToneOptions, log: (m: string) => void = () => {}) {
+export async function runAnalyze(target: string, out: string) {
   const snap = await resolveSnapshot(target, out);
-  const { report, candidates } = await analyzeWithCandidates(snap);
-  if (!tone && existsSync(join(snap, 'tone.json'))) {
-    applyTone(report, candidates, JSON.parse(await readFile(join(snap, 'tone.json'), 'utf8')));
-  }
-  if (tone) {
-    try {
-      applyTone(report, candidates, await runTone(snap, candidates, tone, log));
-    } catch (err) {
-      log(`⚠ tone pass failed: ${(err as Error).message}`);
-      log('  writing the report without it');
-    }
-  }
+  const report = await analyze(snap);
   await writeFile(join(snap, 'analysis.json'), `${JSON.stringify(report, null, 2)}\n`);
   await writeFile(join(snap, 'analysis.md'), toMarkdown(report));
   return snap;
 }
-
-export { DEFAULT_MODEL };

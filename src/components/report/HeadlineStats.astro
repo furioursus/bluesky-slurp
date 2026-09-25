@@ -3,15 +3,13 @@ import type { Report, WindowKey } from '../../lib/analyze.ts';
 import { fmt, pct, trend } from '../../lib/format.ts';
 import Grid from '../ui/Grid.astro';
 import Stat from '../ui/Stat.astro';
-import ToneStat from './ToneStat.astro';
 
 interface Props {
   report: Report;
   windowKey: WindowKey;
-  sampleLimited: boolean;
 }
 
-const { report: r, windowKey, sampleLimited } = Astro.props;
+const { report: r, windowKey } = Astro.props;
 const W = r.byWindow[windowKey];
 const ALL = r.byWindow.all;
 const cmp = windowKey === 'all' ? r.byWindow['90d'] : ALL;
@@ -28,5 +26,5 @@ const trendText =
   <Stat kicker={`Cold outreach · ${W.label}`} value={pct(coldNow)} note="of replies + quotes go to strangers" />
   <Stat kicker={windowKey === 'all' ? 'Last 3 months' : 'All time'} value={pct(coldCmp)} note={trendText} />
   <Stat kicker={`Reply bursts · ${W.label}`} value={fmt(W.targeting.replyBurstsAtNonFollowed.length)} note="5+ replies at one stranger in 24h" />
-  <ToneStat tone={W.tone} hasTonePass={!!r.toneCoverage} sampleLimited={sampleLimited} />
+  <Stat kicker={`Stranger quotes · ${W.label}`} value={fmt(W.targeting.strangerQuotes.count)} note="quote-posts of accounts they don’t follow or like" />
 </Grid>
