@@ -7,5 +7,6 @@ export default defineConfig({
   adapter: node({ mode: 'standalone' }),
   // see docs/web-ui.md#security
   server: { host: '127.0.0.1', port: 4747 },
+  prefetch: { prefetchAll: true, defaultStrategy: 'hover' },
   integrations: [pathfinder()],
 });

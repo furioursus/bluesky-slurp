@@ -1,4 +1,4 @@
-<button class="theme-toggle" type="button" aria-label="Toggle day and night mode">
+<button class="theme-toggle" type="button" aria-label="Toggle day and night mode" transition:persist="theme-toggle">
   <span class="label">day</span>
   <span class="dot" aria-hidden="true"></span>
 </button>
@@ -8,6 +8,9 @@
   const root = document.documentElement;
   const isDark = () => root.dataset.theme === 'dark' || (!root.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
   const sync = () => (toggle.querySelector('.label')!.textContent = isDark() ? 'night' : 'day');
+  document.addEventListener('astro:before-swap', (e) => {
+    if (root.dataset.theme) e.newDocument.documentElement.dataset.theme = root.dataset.theme;
+  });
   toggle.addEventListener('click', () => {
     const next = isDark() ? 'light' : 'dark';
     root.dataset.theme = next;

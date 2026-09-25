@@ -1,6 +1,6 @@
 # Web UI
 
-**TL;DR:** an Astro 7 app rendered on the server by the Node adapter (`npm run dev`, `npm run serve`). Pages read archives straight from disk and arrive fully rendered. The browser only runs JavaScript for the job panel, the theme toggle, the thread-roots toggle, window-tab scroll and click-to-reveal on sensitive media. It's local-only on purpose, and it never renders archived text as HTML.
+**TL;DR:** an Astro 7 app rendered on the server by the Node adapter (`npm run dev`, `npm run serve`). Pages read archives straight from disk and arrive fully rendered. Astro's `ClientRouter` swaps pages in place, so navigation feels like an SPA with no reloads, while every page is still server-rendered HTML. The browser runs a little JavaScript for the router, the job panel, the theme toggle, the thread-roots toggle, scroll keeping and click-to-reveal on sensitive media. It's local-only on purpose, and it never renders archived text as HTML.
 
 ## Structure
 
@@ -8,9 +8,9 @@
 
 ```
 src/
-  lib/            engine (archive, analyze, tone, refs, identity, http, cli) + UI helpers (archives, jobs, appview, format, ui)
+  lib/            engine (archive, analyze, tone, refs, identity, http, cli) + UI helpers (archives, jobs, appview, format, ui, scroll)
   middleware.ts   same-origin check for non-GET requests
-  layouts/        Base (html shell, masthead, theme toggle) · AccountLayout (header + tabs, 404 when not archived)
+  layouts/        Base (html shell, ClientRouter, masthead, theme toggle, scroll keeper) · AccountLayout (header + tabs, 404 when not archived)
   components/
     ui/           Grid · Cell · Section · Stat · Tabs · Check · Ext · People · Chips · EmptyState
     jobs/         JobRunner (the only real island) · ArchiveForm · ToneControls · AnalysisActions · NoReport · UpgradeReport
@@ -52,6 +52,8 @@ src/
 | `GET /blobs/:handle/:file` | downloaded media |
 
 - Jobs live in memory in the server process and are dropped an hour after they start.
+- When a job finishes, the page refreshes through the router (`navigate(current URL, { history: 'replace' })`) and keeps your scroll position. Free re-runs refresh on their own; after a paid tone pass the "Show the report" button does it, so you can read the actual cost first.
+- Navigating away mid-job closes the panel's event stream (`disconnectedCallback`). The job itself keeps running on the server.
 - Astro allows one dev server per project. To test against another archive root, build and run `dist/server/entry.mjs` with `SLURP_ARCHIVES` and `PORT` set.
 
 ## Embeds
@@ -74,19 +76,21 @@ src/
 - **Scoped styles:** a component's `<style>` is scoped to its own template. `Grid` and `Cell` spread their props onto their root element, so a parent's scope attribute reaches them and `class` passed from a parent stays styleable. Use `:global()` only for classes applied through `Ext` (`blurred`, `link-card-link`).
 - **One line, never two:** a grid nested inside a cell drops its own bottom border (`.cell .grid`), since the outer grid already draws that edge. Nested content that needs lines should be full-bleed cells in the same grid, not a grid floating inside padding. A 2-column grid with an odd number of cells stretches the last one across the row, so the ink background never shows through as a black block.
 - **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference. `body` has bottom padding so the last row can always scroll clear of it, after it was found covering the Proceed button.
-- **Theme before paint:** an inline script in `Base.astro` applies the saved theme before first paint so night mode doesn't flash white.
+- **Theme before paint:** an inline script in `Base.astro` applies the saved theme before first paint so night mode doesn't flash white. On router swaps the router copies the new page's `<html>` attributes, which would drop `data-theme`, so `ThemeToggle` writes the current theme onto the incoming document in `astro:before-swap`. The toggle itself is `transition:persist`.
 - **Scroll:** see [Scroll](#scroll).
 - **Stale styles in dev:** after editing a component's `<style>`, Astro's dev server has been seen serving the old CSS on full page loads while the file watcher reports the change. If a style edit seems to do nothing, restart `npm run dev` before debugging the CSS.
 
 ## Scroll
 
-**TL;DR:** pages are full loads, so scroll resets by default. Links inside a `data-keep-scroll` container (the collections list and the time-window tabs) keep your place instead: `ScrollKeeper` (in `Base`) saves the page's scroll and every `data-scroll-id` pane's inner scroll on click, then restores them when the next page is the one you clicked.
+**TL;DR:** `ClientRouter` scrolls to the top after every page swap. Links inside a `data-keep-scroll` container (the collections list and the time-window tabs) keep your place instead. `src/lib/scroll.ts` captures the page's scroll plus every `data-scroll-id` pane's inner scroll when you click such a link, then restores it in `astro:after-swap`, before the browser paints.
 
-- **Scoped to the clicked target:** the saved position is keyed to the link's path and query and is removed as soon as the next page reads it. A stale save can't hijack a later, unrelated navigation.
-- **Deliberately not kept:** the pager and the account tabs (Report / Records / Identity). A new page of records or a different section should start at the top.
-- **Ignored clicks:** modifier or middle clicks (new tab) and links to other origins.
+- **Why `after-swap`:** the router swaps the DOM, scrolls to the top, and dispatches `astro:after-swap` in one synchronous step (`moveToLocation` then `triggerEvent` in `astro/dist/transitions/router.js`). Restoring there means the top-of-page frame never paints. A restore after load, as the earlier sessionStorage version did, always showed one frame at the top: that was the jump.
+- **Not persisted on purpose:** the collections list isn't `transition:persist`, because a persisted element keeps its old `aria-current` highlight. Its inner scroll is carried across the swap instead.
+- **Programmatic refreshes:** the thread-roots toggle and finished jobs call `keepScrollOnNextSwap()` before `navigate()`, so they refresh in place too.
+- **Deliberately not kept:** the pager and the account tabs (Report / Records / Identity). A new page of records or a different section should start at the top. Back and forward use the router's own saved position.
 - **Adding it elsewhere:** put `data-keep-scroll` on the link container, and `data-scroll-id="<name>"` on any inner scrolling pane that should keep its own position.
-- **Verified:** `feed.like` → `feed.repost` → `feed.like` kept the page at 480px and the collections list at 120px each time. A window-tab switch kept 900px. The pager went to the top with nothing left in storage.
+- **Prefetch:** hover prefetch is on for all links (`prefetch` in `astro.config.mjs`). `Ext` links (external sites and media) opt out, so hovering a video doesn't download it.
+- **Verified:** `feed.like` → `feed.repost` kept 480px / 120px, and `graph.follow` kept 620px / 200px, already restored at `after-swap`. The roots toggle kept 900px. A finished job refreshed at 4497px. The pager and the account tabs went to 0, back returned to 700, and night mode stayed on through 6 swaps. The whole run stayed in one document.
 
 ## Masthead
 

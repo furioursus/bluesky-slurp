@@ -14,12 +14,16 @@ const { checked } = Astro.props;
 </roots-toggle>
 
 <script>
+  import { navigate } from 'astro:transitions/client';
+  import { keepScrollOnNextSwap } from '../../lib/scroll.ts';
+
   class RootsToggle extends HTMLElement {
     connectedCallback() {
       this.querySelector('input')!.addEventListener('change', (e) => {
         const on = (e.target as HTMLInputElement).checked;
         document.cookie = `${this.dataset.cookie}=${on ? '1' : '0'}; path=/; max-age=31536000; samesite=lax`;
-        location.reload();
+        keepScrollOnNextSwap();
+        navigate(location.pathname + location.search, { history: 'replace' });
       });
     }
   }

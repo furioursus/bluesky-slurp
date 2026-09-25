@@ -49,9 +49,12 @@ const { manifest: m, profile: p } = snap;
 </Grid>
 
 <script>
-  for (const picker of document.querySelectorAll<HTMLSelectElement>('.snapshot-picker')) {
-    picker.addEventListener('change', () => (location.href = `${picker.dataset.base}/${picker.value}/${picker.dataset.tab}`));
-  }
+  import { navigate } from 'astro:transitions/client';
+
+  document.addEventListener('change', (e) => {
+    const picker = (e.target as HTMLElement).closest<HTMLSelectElement>('.snapshot-picker');
+    if (picker) navigate(`${picker.dataset.base}/${picker.value}/${picker.dataset.tab}`);
+  });
 </script>
 
 <style>

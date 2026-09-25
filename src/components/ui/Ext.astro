@@ -9,4 +9,4 @@ interface Props {
 const { href, class: className } = Astro.props;
 ---
 
-<a href={safeHref(href)} target="_blank" rel="noopener noreferrer" class={className}><slot /></a>
+<a href={safeHref(href)} target="_blank" rel="noopener noreferrer" data-astro-prefetch="false" class={className}><slot /></a>
