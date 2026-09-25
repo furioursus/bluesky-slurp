@@ -17,6 +17,15 @@ node src/cli.ts analyze furioursus.dev --tone   # + Claude tone pass (estimate, 
 
 Input can be a handle, `@handle`, a DID (`did:plc:…` / `did:web:…`), an `at://` URI, or a `bsky.app/profile/…` URL. `--out <dir>` changes the archive root (default `./archives`).
 
+## Web UI
+
+**TL;DR:** `npm run serve` → http://127.0.0.1:4747. It's the same engine as the CLI in a brutalist browser UI: archive an account, read the report, browse every record with its pointers, and approve the tone-pass estimate with a button.
+
+- **Local only:** it binds to `127.0.0.1` and rejects cross-origin POSTs, because it writes to disk and can spend Claude credits. Your API key stays server-side in `.env`.
+- **Screens:** New archive (form, then a live log), Accounts, and per account: Report / Records / Identity. Records are grouped by app, 50 per page, newest first. Media shows from `blobs/` when downloaded, otherwise images load from the PDS.
+- **Flags:** `npm run serve -- --port 5000 --out other-archives`.
+- **No build step:** `web/` is plain HTML, CSS and an ES module. Archived text is inserted as text, never as HTML.
+
 ## What gets archived
 
 **TL;DR:** the whole signed repo from the account's own PDS, decoded to JSONL per collection, plus identity and the Bluesky AppView profile.

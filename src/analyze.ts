@@ -360,6 +360,13 @@ ${examples}
 export async function runAnalyze(target: string, out: string, tone?: ToneOptions, log: (m: string) => void = () => {}) {
   const snap = await resolveSnapshot(target, out);
   const { report, candidates } = await analyzeWithCandidates(snap);
+  if (!tone && existsSync(join(snap, 'tone.json'))) {
+    // keep an earlier tone pass in the report when re-running the free analysis
+    const cached = JSON.parse(await readFile(join(snap, 'tone.json'), 'utf8'));
+    const uris = new Set(candidates.map((c) => c.uri));
+    const results = Object.fromEntries(Object.entries(cached).filter(([uri]) => uris.has(uri)));
+    if (Object.keys(results).length) report.tone = summarizeTone(results as any);
+  }
   if (tone) {
     // a failed tone pass (no credentials, API outage) shouldn't cost the structural report
     try {

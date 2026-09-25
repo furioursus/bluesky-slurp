@@ -52,10 +52,24 @@ export interface ToneResult {
   model: string;
 }
 
+export interface ToneEstimate {
+  posts: number;
+  requests: number;
+  model: string;
+  inputTokens: number;
+  outputLow: number;
+  outputHigh: number;
+  /** dollars; null when the model has no price on file */
+  costLow: number | null;
+  costHigh: number | null;
+}
+
 export interface ToneOptions {
   model: string;
   limit: number;
   yes: boolean;
+  /** asked before any paid request; defaults to a y/N prompt on the terminal */
+  confirm?: (estimate: ToneEstimate) => Promise<boolean>;
 }
 
 const SYSTEM = `You label the tone of social media posts for someone deciding whether an account engages in good or bad faith.
@@ -209,14 +223,21 @@ export async function runTone(
   }
   const outLow = todo.length * 60;
   const outHigh = todo.length * 180 + requests.length * 800;
+  const estimate: ToneEstimate = {
+    posts: todo.length,
+    requests: requests.length,
+    model: opts.model,
+    inputTokens,
+    outputLow: outLow,
+    outputHigh: outHigh,
+    costLow: price ? (inputTokens * price.input + outLow * price.output) / 1e6 : null,
+    costHigh: price ? (inputTokens * price.input + outHigh * price.output) / 1e6 : null,
+  };
   log(`  estimate: ${fmt(inputTokens)} input + ${fmt(outLow)}–${fmt(outHigh)} output tokens across ${requests.length} requests on ${opts.model}`);
-  if (price) {
-    const lo = (inputTokens * price.input + outLow * price.output) / 1e6;
-    const hi = (inputTokens * price.input + outHigh * price.output) / 1e6;
-    log(`  ≈ ${money(lo)}–${money(hi)}`);
-  }
-  if (!opts.yes && !(await confirm('  proceed? [y/N] '))) {
-    log('  skipped tone pass (pass --yes to run non-interactively)');
+  if (estimate.costLow !== null) log(`  ≈ ${money(estimate.costLow)}–${money(estimate.costHigh!)}`);
+  const ask = opts.confirm ?? (() => confirm('  proceed? [y/N] '));
+  if (!opts.yes && !(await ask(estimate))) {
+    log('  skipped tone pass');
     return pick(cache, chosen);
   }
 

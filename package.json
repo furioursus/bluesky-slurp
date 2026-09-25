@@ -4,7 +4,8 @@
   "description": "Archive an atproto account's public activity",
   "scripts": {
     "slurp": "node --env-file-if-exists=.env src/cli.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "serve": "node --env-file-if-exists=.env src/server.ts"
   },
   "type": "module",
   "dependencies": {
