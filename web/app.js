@@ -103,6 +103,29 @@ function refLabel(ref) {
 // ---- embedded posts (for likes and reposts) ------------------------------------
 
 const EMBED_ROLES = new Set(['liked', 'reposted']);
+const EMBED_KICKER = { 'reply-root': 'Thread root', 'reply-parent': 'Replying to', liked: 'Liked post', reposted: 'Reposted post' };
+
+const prefs = {
+  get showRoots() {
+    try { return localStorage.getItem('slurp-show-roots') === '1'; } catch { return false; }
+  },
+  set showRoots(v) {
+    try { localStorage.setItem('slurp-show-roots', v ? '1' : '0'); } catch {}
+  },
+};
+
+/** Which pointers get an embedded post card: likes/reposts and reply parents always, thread roots on request. */
+function embedTargets(pointers) {
+  const isPost = (x) => x.kind === 'record' && x.target.includes('/app.bsky.feed.post/');
+  const parent = pointers.find((x) => x.role === 'reply-parent');
+  const picked = pointers.filter((x) => isPost(x) && (
+    EMBED_ROLES.has(x.role) ||
+    x.role === 'reply-parent' ||
+    (x.role === 'reply-root' && prefs.showRoots && x.target !== parent?.target)
+  ));
+  // read a thread top-down: root, then the post being answered
+  return picked.sort((a, b) => (a.role === 'reply-root' ? -1 : b.role === 'reply-root' ? 1 : 0));
+}
 const SENSITIVE = new Set(['porn', 'sexual', 'nudity', 'graphic-media', 'gore']);
 const posts = new Map(); // at:// uri → PostView, or null when deleted/hidden
 
@@ -421,11 +444,18 @@ const trend = (delta) => (delta >= 3 ? `rising, +${delta.toFixed(1)} pts` : delt
 function reportView(handle, snapshot, r, cfg) {
   if (!r) {
     const slot = h('div');
+    const tone = toneControls(cfg);
+    const run = h('button', { class: 'btn solid', type: 'button', onclick: async () => {
+      run.disabled = true;
+      slot.replaceChildren(await jobPanel(
+        { mode: 'analyze', input: handle, snapshot, tone: tone.tone.checked, model: tone.model.value, toneLimit: Number(tone.limit.value) },
+        () => route(),
+      ));
+    } }, 'Run analysis');
     return h('div', {},
-      grid('cols-1', cell({ class: 'empty' }, h('h2', { class: 'display' }, 'No report yet'), h('p', { class: 'muted' }, 'The structural analysis is free and runs offline in about a second.'),
-        h('button', { class: 'btn solid', type: 'button', onclick: async () => {
-          slot.replaceChildren(await jobPanel({ mode: 'analyze', input: handle, snapshot }, () => route()));
-        } }, 'Run analysis'))),
+      grid('cols-side',
+        cell({ class: 'empty' }, h('h2', { class: 'display' }, 'No report yet'), h('p', { class: 'muted' }, 'The structural analysis is free and runs offline in about a second. Add a tone pass to have Claude label replies and quotes too.')),
+        cell({ class: 'stack-lg' }, tone.el, h('div', { class: 'btn-row' }, run))),
       slot);
   }
   const s = r.shape;
@@ -555,7 +585,12 @@ async function recordsView(handle, snapshot, m, collection, query) {
   return grid('cols-side',
     cell({ class: 'flush' }, h('div', { class: 'cell' }, h('h2', { class: 'subtitle' }, 'Collections'), h('p', { class: 'muted' }, `${cols.length} across ${groups.size} apps`)), list),
     cell({ class: 'flush' },
-      h('div', { class: 'cell stack', style: 'border-bottom:1px solid var(--ink)' }, h('h2', { class: 'subtitle break', style: 'text-transform:none' }, collection ?? 'No records'), pager),
+      h('div', { class: 'cell stack', style: 'border-bottom:1px solid var(--ink)' },
+        h('h2', { class: 'subtitle break', style: 'text-transform:none' }, collection ?? 'No records'),
+        collection === 'app.bsky.feed.post' && h('label', { class: 'check' },
+          h('input', { type: 'checkbox', checked: prefs.showRoots, onchange: (e) => { prefs.showRoots = e.target.checked; route(); } }),
+          h('span', {}, h('strong', {}, 'Show thread roots'), h('small', {}, 'Replies always show the post they answer. This adds the post that started the thread.'))),
+        pager),
       page.records.map((rec) => recordCard(handle, rec)),
       page.records.length > 5 && h('div', { class: 'cell', style: 'border-top:1px solid var(--ink)' }, pager.cloneNode(true)),
     ),
@@ -574,8 +609,9 @@ function recordCard(handle, rec) {
     ),
     text && h('p', { class: 'record-text' }, text),
     pointers.length > 0 && h('ul', { class: 'refs' }, pointers.map((x) => h('li', {}, h('span', { class: 'role' }, x.role), h('span', {}, ext(x.web, refLabel(x)))))),
-    pointers.filter((x) => EMBED_ROLES.has(x.role) && x.target.includes('/app.bsky.feed.post/')).map((x) =>
-      h('div', { class: 'embed pending', 'data-embed-uri': x.target }, h('span', { class: 'muted' }, 'Loading post…'))),
+    embedTargets(pointers).map((x) => h('div', { class: 'embed-slot' },
+      h('p', { class: 'kicker' }, EMBED_KICKER[x.role]),
+      h('div', { class: 'embed pending', 'data-embed-uri': x.target }, h('span', { class: 'muted' }, 'Loading post…')))),
     media.length > 0 && h('div', { class: 'thumbs' }, media.map((x) => {
       const src = x.local ? `/blobs/${handle}/${x.local.split('/').pop()}` : x.web;
       if (x.mimeType?.startsWith('video/')) return x.local ? h('video', { src, controls: true, preload: 'metadata' }) : ext(x.web, h('span', { class: 'chip' }, 'video ↗'));
