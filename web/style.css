@@ -241,8 +241,28 @@ table.data tr:last-child td { border-bottom: 0; }
 .refs .role { text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.08em; padding-top: 3px; }
 .refs a { overflow-wrap: anywhere; }
 .thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.thumbs img, .thumbs video { height: 140px; max-width: 100%; object-fit: cover; filter: grayscale(1); border: 1px solid var(--ink); }
+.thumbs img, .thumbs video { height: 140px; min-width: 96px; max-width: 100%; object-fit: cover; filter: grayscale(1); border: 1px solid var(--ink); background: var(--faint); }
 .thumbs img:hover, .thumbs video:hover { filter: none; }
+/* embedded post (the target of a like or repost) */
+.embed { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px; margin-top: 12px; padding: 14px; border: 1px solid var(--ink); }
+.embed.pending, .embed.gone { display: block; }
+.embed.gone { border-style: dashed; font-size: 0.9rem; }
+.avatar.sm { width: 44px; height: 44px; }
+.embed-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 0.9rem; }
+.embed-text { margin-top: 6px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.embed-stats { font-size: 0.8rem; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.embed .thumbs img { height: 120px; }
+.quote { border-left: 3px solid var(--ink); padding: 4px 0 4px 12px; margin-top: 10px; font-size: 0.95rem; }
+.link-card { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; border: 1px solid var(--ink); margin-top: 10px; padding: 10px; font-size: 0.9rem; }
+.link-card img { width: 96px; height: 72px; object-fit: cover; filter: grayscale(1); }
+a:has(> .link-card) { text-decoration: none; display: block; }
+.video-thumb { position: relative; display: inline-block; }
+.video-thumb b { position: absolute; left: 8px; bottom: 8px; background: var(--ink); color: var(--paper); padding: 2px 8px; font-weight: 400; font-size: 0.8rem; }
+.blurred { position: relative; overflow: hidden; display: inline-block; cursor: pointer; }
+.blurred img { filter: blur(18px) grayscale(1); }
+.blurred img { min-width: 180px; }
+.blurred::after { content: 'Sensitive · click to show'; position: absolute; inset: auto 8px 8px 8px; background: var(--ink); color: var(--paper); font-size: 0.75rem; padding: 2px 6px; text-align: center; }
+
 details.raw { margin-top: 12px; }
 details.raw summary { cursor: pointer; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; }
 details.raw pre { font-family: var(--mono); font-size: 0.75rem; overflow: auto; max-height: 360px; border: 1px solid var(--ink); padding: 12px; margin: 8px 0 0; }

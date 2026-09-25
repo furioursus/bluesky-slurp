@@ -100,6 +100,94 @@ function refLabel(ref) {
   return h('span', { 'data-did': did, 'data-suffix': suffix }, `${did}${suffix}`);
 }
 
+// ---- embedded posts (for likes and reposts) ------------------------------------
+
+const EMBED_ROLES = new Set(['liked', 'reposted']);
+const SENSITIVE = new Set(['porn', 'sexual', 'nudity', 'graphic-media', 'gore']);
+const posts = new Map(); // at:// uri → PostView, or null when deleted/hidden
+
+async function fetchPosts(uris) {
+  const todo = [...new Set(uris)].filter((u) => !posts.has(u));
+  for (let i = 0; i < todo.length; i += 25) {
+    const batch = todo.slice(i, i + 25);
+    try {
+      const res = await fetch(`${APPVIEW}/app.bsky.feed.getPosts?${batch.map((u) => `uris=${encodeURIComponent(u)}`).join('&')}`);
+      for (const p of (await res.json()).posts ?? []) posts.set(p.uri, p);
+    } catch {}
+    // anything the AppView didn't return is deleted, taken down, or hidden from logged-out viewers
+    for (const u of batch) if (!posts.has(u)) posts.set(u, null);
+  }
+}
+
+/** Replace every [data-embed-uri] placeholder with a card for that post. */
+async function hydrateEmbeds(root) {
+  const slots = [...root.querySelectorAll('[data-embed-uri]')];
+  if (!slots.length) return;
+  await fetchPosts(slots.map((el) => el.dataset.embedUri));
+  for (const el of slots) el.replaceWith(postEmbed(el.dataset.embedUri, posts.get(el.dataset.embedUri)));
+}
+
+const bskyPostUrl = (uri) => {
+  const [repo, , rkey] = uri.slice(5).split('/');
+  return `https://bsky.app/profile/${repo}/post/${rkey}`;
+};
+
+function postEmbed(uri, p) {
+  if (!p) {
+    return h('div', { class: 'embed gone' }, h('p', {}, h('strong', {}, 'Post unavailable. '), 'Deleted, taken down, or hidden from logged-out viewers. The pointer above still records which post it was.'));
+  }
+  const labels = [...(p.labels ?? []), ...(p.author.labels ?? [])].map((l) => l.val).filter((v) => !v.startsWith('!'));
+  const sensitive = labels.some((l) => SENSITIVE.has(l));
+  const blurToggle = (el) => {
+    if (!sensitive) return el;
+    el.classList.add('blurred');
+    el.addEventListener('click', (e) => {
+      if (el.classList.contains('blurred')) {
+        e.preventDefault();
+        el.classList.remove('blurred');
+      }
+    });
+    return el;
+  };
+  return h('article', { class: 'embed' },
+    p.author.avatar ? h('img', { class: 'avatar sm', src: p.author.avatar, alt: '', loading: 'lazy' }) : h('div', { class: 'avatar sm' }),
+    h('div', { class: 'embed-body' },
+      h('div', { class: 'embed-head' },
+        h('span', { class: 'break' }, p.author.displayName && h('strong', {}, `${p.author.displayName} `), h('span', { class: 'muted' }, `@${p.author.handle}`)),
+        ext(bskyPostUrl(p.uri), `${when(p.record?.createdAt)} ↗`)),
+      p.record?.text && h('p', { class: 'embed-text' }, p.record.text),
+      embedMedia(p.embed, blurToggle),
+      labels.length > 0 && h('p', {}, labels.map((l) => h('span', { class: 'tag', style: 'margin:0 6px 0 0' }, l))),
+      h('p', { class: 'embed-stats muted' }, `${fmt(p.replyCount)} replies · ${fmt(p.repostCount)} reposts · ${fmt(p.quoteCount)} quotes · ${fmt(p.likeCount)} likes`),
+    ),
+  );
+}
+
+/** Images, video poster, link card, and quoted post, from the AppView's hydrated embed view. */
+function embedMedia(e, blurToggle) {
+  if (!e) return null;
+  const type = e.$type ?? '';
+  if (type.startsWith('app.bsky.embed.recordWithMedia')) return [embedMedia(e.media, blurToggle), embedMedia(e.record, blurToggle)];
+  if (type.startsWith('app.bsky.embed.images')) {
+    return h('div', { class: 'thumbs' }, e.images.map((img) => blurToggle(ext(img.fullsize, h('img', { src: img.thumb, alt: img.alt || '', loading: 'lazy' })))));
+  }
+  if (type.startsWith('app.bsky.embed.video')) {
+    return e.thumbnail ? h('div', { class: 'thumbs' }, blurToggle(h('span', { class: 'video-thumb' }, h('img', { src: e.thumbnail, alt: e.alt || '', loading: 'lazy' }), h('b', {}, '▶ video')))) : h('p', { class: 'muted' }, '▶ video');
+  }
+  if (type.startsWith('app.bsky.embed.external')) {
+    const x = e.external;
+    return ext(x.uri, h('div', { class: 'link-card' }, x.thumb && h('img', { src: x.thumb, alt: '', loading: 'lazy' }), h('div', {}, h('strong', {}, x.title || x.uri), x.description && h('p', { class: 'muted' }, x.description), h('p', { class: 'mono muted break' }, x.uri.replace(/^https?:\/\//, '').split('/')[0]))));
+  }
+  if (type.startsWith('app.bsky.embed.record')) {
+    const r = e.record;
+    if (!r?.author) return h('div', { class: 'quote muted' }, 'Quoted post unavailable');
+    return h('div', { class: 'quote' },
+      h('p', {}, h('span', { class: 'kicker' }, 'Quoting '), ext(r.uri?.includes('/app.bsky.feed.post/') ? bskyPostUrl(r.uri) : `https://bsky.app/profile/${r.author.did}`, `@${r.author.handle}`)),
+      r.value?.text && h('p', { class: 'embed-text' }, r.value.text));
+  }
+  return null;
+}
+
 // ---- job panel -------------------------------------------------------------
 
 /** Starts a job and returns a panel that streams its log, asks about tone estimates, and calls onDone. */
@@ -302,6 +390,7 @@ async function accountView(handle, snapshot, tab = 'report', rest = [], query) {
   else if (tab === 'identity') body.replaceChildren(await identityView(handle, snapshot, m));
   else body.replaceChildren(reportView(handle, snapshot, snap.analysis, cfg));
   hydrateHandles(body);
+  hydrateEmbeds(body);
 }
 
 // ---- report ------------------------------------------------------------------------
@@ -485,6 +574,8 @@ function recordCard(handle, rec) {
     ),
     text && h('p', { class: 'record-text' }, text),
     pointers.length > 0 && h('ul', { class: 'refs' }, pointers.map((x) => h('li', {}, h('span', { class: 'role' }, x.role), h('span', {}, ext(x.web, refLabel(x)))))),
+    pointers.filter((x) => EMBED_ROLES.has(x.role) && x.target.includes('/app.bsky.feed.post/')).map((x) =>
+      h('div', { class: 'embed pending', 'data-embed-uri': x.target }, h('span', { class: 'muted' }, 'Loading post…'))),
     media.length > 0 && h('div', { class: 'thumbs' }, media.map((x) => {
       const src = x.local ? `/blobs/${handle}/${x.local.split('/').pop()}` : x.web;
       if (x.mimeType?.startsWith('video/')) return x.local ? h('video', { src, controls: true, preload: 'metadata' }) : ext(x.web, h('span', { class: 'chip' }, 'video ↗'));
