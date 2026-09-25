@@ -38,6 +38,13 @@ const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString('en-US'));
 const pct = (n) => (n == null ? '—' : `${n}%`);
 const money = (n) => (n == null ? null : `$${n.toFixed(n < 1 ? 3 : 2)}`);
 const day = (iso) => (iso ? iso.slice(0, 10) : '—');
+/** Compact local timestamp for tight spots: 2026-09-25 14:19 */
+const stamp = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 const when = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—');
 
 async function api(path, opts) {
@@ -383,11 +390,11 @@ async function accountView(handle, snapshot, tab = 'report', rest = [], query) {
   const base = `#/a/${handle}/${snapshot}`;
 
   const snapPicker = h('select', { class: 'input small', 'aria-label': 'Snapshot', onchange: (e) => (location.hash = `#/a/${handle}/${e.target.value}/${tab}`) },
-    acc.snapshots.map((s) => h('option', { value: s.snapshot, selected: s.snapshot === snapshot }, `${when(s.fetchedAt)} · ${fmt(s.totalRecords)}`)));
+    acc.snapshots.map((s) => h('option', { value: s.snapshot, selected: s.snapshot === snapshot, title: `${when(s.fetchedAt)} · ${fmt(s.totalRecords)} records` }, `${stamp(s.fetchedAt)} · ${fmt(s.totalRecords)}`)));
 
-  const header = grid('cols-4 account-head',
+  const header = grid('account-head',
     cell({ class: 'flush' }, p?.avatar ? h('img', { class: 'avatar lg', src: p.avatar, alt: '' }) : h('div', { class: 'avatar lg' })),
-    cell({ class: 'span-2 stack' },
+    cell({ class: 'stack' },
       h('p', { class: 'kicker' }, m.handleVerified ? 'Verified handle' : '⚠ Handle does not verify'),
       h('h1', { class: 'title break', style: 'text-transform:none' }, `@${m.handle ?? m.did}`),
       p?.displayName && h('p', { class: 'subtitle', style: 'text-transform:none' }, p.displayName),
