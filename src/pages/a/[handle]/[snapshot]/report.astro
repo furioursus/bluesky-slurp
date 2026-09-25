@@ -1,0 +1,63 @@
+---
+import AnalysisActions from '../../../../components/jobs/AnalysisActions.astro';
+import NoReport from '../../../../components/jobs/NoReport.astro';
+import UpgradeReport from '../../../../components/jobs/UpgradeReport.astro';
+import HeadlineStats from '../../../../components/report/HeadlineStats.astro';
+import InterestsSection from '../../../../components/report/InterestsSection.astro';
+import ShapeSection from '../../../../components/report/ShapeSection.astro';
+import TargetingSection from '../../../../components/report/TargetingSection.astro';
+import ToneSection from '../../../../components/report/ToneSection.astro';
+import Cell from '../../../../components/ui/Cell.astro';
+import Grid from '../../../../components/ui/Grid.astro';
+import Section from '../../../../components/ui/Section.astro';
+import Tabs from '../../../../components/ui/Tabs.astro';
+import AccountLayout from '../../../../layouts/AccountLayout.astro';
+import type { WindowKey } from '../../../../lib/analyze.ts';
+import { loadSnapshot } from '../../../../lib/archives.ts';
+import { shortDate } from '../../../../lib/format.ts';
+import { WINDOW_TABS } from '../../../../lib/ui.ts';
+
+const { handle = '', snapshot = '' } = Astro.params;
+const snap = await loadSnapshot(handle, snapshot);
+const r = snap?.analysis ?? null;
+const requested = Astro.url.searchParams.get('w');
+const key = (r?.windows?.includes(requested as WindowKey) ? requested : 'all') as WindowKey;
+const W = r?.byWindow?.[key];
+const base = `/a/${handle}/${snapshot}/report`;
+const coverage = r?.toneCoverage ?? null;
+const sampleLimited = !!(W && coverage && (!W.since || Date.parse(W.since) < Date.parse(coverage.from)));
+---
+
+<AccountLayout snap={snap} tab="report">
+  {
+    !r ? (
+      <NoReport handle={handle} snapshot={snapshot} />
+    ) : !r.byWindow || !W ? (
+      <UpgradeReport handle={handle} snapshot={snapshot} />
+    ) : (
+      <>
+        <Tabs label="Time window" keepScroll items={r.windows.map((k) => ({ href: `${base}?w=${k}`, label: WINDOW_TABS[k] ?? k, current: k === key }))} />
+        <HeadlineStats report={r} windowKey={key} sampleLimited={sampleLimited} />
+        <Grid>
+          <Cell>
+            <p><strong>Signals, not a verdict. </strong>A high and rising cold share, bursts at one person, and quotes of strangers are the classic bad-faith patterns. Open the linked posts before you conclude anything. Lots of blocks usually means block lists, not aggression.</p>
+            {W.shape.posts === 0 && <p class="notice mt-sm">No posts in the {W.label.toLowerCase()} before this snapshot.</p>}
+          </Cell>
+        </Grid>
+        <ShapeSection report={r} windowKey={key} />
+        <TargetingSection window={W} />
+        {W.tone ? (
+          <ToneSection window={W} coverage={coverage} sampleLimited={sampleLimited} />
+        ) : (
+          coverage && (
+            <Section title="Tone" sub={W.label}>
+              <Cell><p>None of the labelled posts fall in this window. Labels cover {shortDate(coverage.from)} – {shortDate(coverage.to)}.</p></Cell>
+            </Section>
+          )
+        )}
+        <AnalysisActions handle={handle} snapshot={snapshot} hasTone={!!coverage} />
+        <InterestsSection window={W} apps={r.appsUsed} />
+      </>
+    )
+  }
+</AccountLayout>

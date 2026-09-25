@@ -1,0 +1,47 @@
+---
+import type { WindowReport } from '../../lib/analyze.ts';
+import { fmt } from '../../lib/format.ts';
+import Cell from '../ui/Cell.astro';
+import Ext from '../ui/Ext.astro';
+import Grid from '../ui/Grid.astro';
+import People from '../ui/People.astro';
+import Section from '../ui/Section.astro';
+
+interface Props {
+  window: WindowReport;
+}
+
+const { window: W } = Astro.props;
+const t = W.targeting;
+---
+
+<Section title="Targeting" sub={`${W.label}. “Not followed” is as of this snapshot.`}>
+  <Grid cols="2">
+    <Cell stack="sm"><h3 class="subtitle">Most replied to</h3><People people={t.mostRepliedTo} /></Cell>
+    <Cell stack="sm"><h3 class="subtitle">Most quoted</h3><People people={t.mostQuoted} /></Cell>
+    <Cell stack="sm" span>
+      <h3 class="subtitle">Reply bursts at non-followed accounts</h3>
+      {
+        t.replyBurstsAtNonFollowed.length ? (
+          <ol class="ranked">
+            {t.replyBurstsAtNonFollowed.map((b) => (
+              <li>
+                <span class="who">
+                  <Ext href={b.web}>{b.handle ? `@${b.handle}` : b.did}</Ext> · {b.day} ·{' '}
+                  {b.examples.map((u, i) => <><Ext href={u}>[{i + 1}]</Ext>{' '}</>)}
+                </span>
+                <span class="count">{fmt(b.count)}</span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p class="muted">None</p>
+        )
+      }
+    </Cell>
+    <Cell stack="sm" span>
+      <h3 class="subtitle">Quotes of strangers: {fmt(t.strangerQuotes.count)}</h3>
+      {t.strangerQuotes.examples.length > 0 && <p>Latest: {t.strangerQuotes.examples.map((u, i) => <><Ext href={u}>[{i + 1}]</Ext>{' '}</>)}</p>}
+    </Cell>
+  </Grid>
+</Section>

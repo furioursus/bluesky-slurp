@@ -1,0 +1,27 @@
+---
+import { ROOTS_COOKIE } from '../../lib/ui.ts';
+import Check from '../ui/Check.astro';
+
+interface Props {
+  checked: boolean;
+}
+
+const { checked } = Astro.props;
+---
+
+<roots-toggle data-cookie={ROOTS_COOKIE}>
+  <Check name="roots" title="Show thread roots" note="Replies always show the post they answer. This adds the post that started the thread." checked={checked} />
+</roots-toggle>
+
+<script>
+  class RootsToggle extends HTMLElement {
+    connectedCallback() {
+      this.querySelector('input')!.addEventListener('change', (e) => {
+        const on = (e.target as HTMLInputElement).checked;
+        document.cookie = `${this.dataset.cookie}=${on ? '1' : '0'}; path=/; max-age=31536000; samesite=lax`;
+        location.reload();
+      });
+    }
+  }
+  customElements.define('roots-toggle', RootsToggle);
+</script>

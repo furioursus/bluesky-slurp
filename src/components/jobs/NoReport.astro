@@ -1,0 +1,28 @@
+---
+import Cell from '../ui/Cell.astro';
+import Grid from '../ui/Grid.astro';
+import JobRunner from './JobRunner.astro';
+import ToneControls from './ToneControls.astro';
+
+interface Props {
+  handle: string;
+  snapshot: string;
+}
+
+const { handle, snapshot } = Astro.props;
+---
+
+<JobRunner mode="analyze" input={handle} snapshot={snapshot} after="reload">
+  <form>
+    <Grid cols="side">
+      <Cell empty>
+        <h2 class="display">No report yet</h2>
+        <p class="muted">The structural analysis is free and runs offline in about a second. Add a tone pass to have Claude label replies and quotes too.</p>
+      </Cell>
+      <Cell stack="lg">
+        <ToneControls />
+        <div class="btn-row"><button class="btn solid" type="submit">Run analysis</button></div>
+      </Cell>
+    </Grid>
+  </form>
+</JobRunner>

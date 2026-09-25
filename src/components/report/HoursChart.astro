@@ -1,0 +1,22 @@
+---
+interface Props {
+  hours: number[];
+}
+
+const { hours } = Astro.props;
+const max = Math.max(1, ...hours);
+---
+
+<div>
+  <p class="kicker">Posts by hour (UTC)</p>
+  <div class="hours" role="img" aria-label={`Posts by UTC hour, busiest at ${hours.indexOf(max)}:00`}>
+    {hours.map((n, i) => <i style={`height:${(n / max) * 100}%`} title={`${i}:00 · ${n}`} />)}
+  </div>
+  <div class="axis">{['00', '06', '12', '18'].map((t) => <span>{t}</span>)}</div>
+</div>
+
+<style>
+  .hours { display: grid; grid-template-columns: repeat(24, 1fr); align-items: end; gap: var(--space-3xs); height: var(--chart); }
+  i { background: var(--ink); min-height: var(--line); }
+  .axis { display: grid; grid-template-columns: repeat(4, 1fr); font-size: var(--text-2xs); color: var(--muted); margin-top: var(--space-xs); }
+</style>

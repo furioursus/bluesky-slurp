@@ -1,0 +1,20 @@
+---
+import Cell from './Cell.astro';
+import Grid from './Grid.astro';
+
+interface Props {
+  title: string;
+  body?: string;
+  size?: 'display' | 'title';
+}
+
+const { title, body, size = 'display' } = Astro.props;
+---
+
+<Grid>
+  <Cell empty>
+    <h1 class={size}>{title}</h1>
+    {body && <p class="muted">{body}</p>}
+    <slot />
+  </Cell>
+</Grid>

@@ -1,0 +1,21 @@
+---
+import type { HTMLAttributes } from 'astro/types';
+
+interface Props extends HTMLAttributes<'div'> {
+  flush?: boolean;
+  divided?: boolean;
+  span?: boolean;
+  stack?: 'sm' | 'lg';
+  empty?: boolean;
+  as?: 'div' | 'article' | 'nav';
+}
+
+const { flush, divided, span, stack, empty, as: Tag = 'div', class: className, ...rest } = Astro.props;
+---
+
+<Tag
+  class:list={['cell', className, { flush, divided, empty, 'span-all': span, stack: stack === 'sm', 'stack-lg': stack === 'lg' }]}
+  {...rest}
+>
+  <slot />
+</Tag>

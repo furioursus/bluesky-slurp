@@ -1,0 +1,27 @@
+---
+interface Props {
+  name: string;
+  title: string;
+  note: string;
+  checked?: boolean;
+}
+
+const { name, title, note, checked = false } = Astro.props;
+---
+
+<label class="check">
+  <input type="checkbox" name={name} checked={checked} />
+  <span>
+    <strong>{title}</strong>
+    <small>{note}</small>
+  </span>
+</label>
+
+<style>
+  .check { display: flex; gap: var(--space-sm); align-items: flex-start; cursor: pointer; }
+  input { appearance: none; flex: none; width: var(--box); height: var(--box); margin: 0; border: var(--line) solid var(--ink); background: var(--paper); cursor: pointer; display: grid; place-content: center; }
+  input::after { content: ''; width: var(--box-mark); height: var(--box-mark); background: var(--ink); transform: scale(0); }
+  input:checked::after { transform: scale(1); }
+  strong { display: block; font-weight: 400; text-transform: uppercase; font-size: var(--text-lg); line-height: var(--box); }
+  small { display: block; color: var(--muted); font-size: var(--text-sm); }
+</style>

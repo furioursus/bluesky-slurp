@@ -1,6 +1,6 @@
 # Tone pass
 
-**TL;DR:** optional and paid. Claude labels a sample of replies and quotes, each read with the post it answered. It counts input tokens exactly, shows a cost range, and asks before spending. Labels are cached per post. Code: `src/tone.ts`.
+**TL;DR:** optional and paid. Claude labels a sample of replies and quotes, each read with the post it answered. It counts input tokens exactly, shows a cost range, and asks before spending. Labels are cached per post. Code: `src/lib/tone.ts`.
 
 ## Sampling
 
@@ -12,7 +12,7 @@
 
 ## Estimate
 
-**TL;DR:** input tokens are exact (from `count_tokens`, which is free), output is a range, and the cost is computed from a price table in `tone.ts`.
+**TL;DR:** input tokens are exact (from `count_tokens`, which is free), output is a range, and the cost is computed from a price table in `src/lib/tone.ts`.
 
 - The output range is `posts × 60` to `posts × 180 + requests × 800`, because thinking length varies.
 - Cost uses input and output rates per model. Cache reads bill at 0.1× input and 5-minute cache writes at 1.25×, and actual cost is printed after the run.

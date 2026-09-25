@@ -303,7 +303,7 @@ async function analyzeWithCandidates(snap: string) {
   return { report, candidates: toneCandidates };
 }
 
-interface Person {
+export interface Person {
   did: string;
   handle: string | null;
   web: string;
@@ -311,7 +311,7 @@ interface Person {
   count: number;
 }
 
-interface WindowReport {
+export interface WindowReport {
   key: WindowKey;
   label: string;
   since: string | null;
@@ -351,7 +351,7 @@ interface WindowReport {
   tone: ReturnType<typeof summarizeTone> | null;
 }
 
-type Report = Awaited<ReturnType<typeof analyze>>;
+export type Report = Awaited<ReturnType<typeof analyze>>;
 
 function applyTone(report: Report, candidates: ToneCandidate[], results: Record<string, ToneResult>) {
   const at = new Map(candidates.map((c) => [c.uri, c.at]));

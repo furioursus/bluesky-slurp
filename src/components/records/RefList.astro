@@ -1,0 +1,34 @@
+---
+import type { Ref } from '../../lib/refs.ts';
+import { didOf } from '../../lib/ui.ts';
+import Ext from '../ui/Ext.astro';
+
+interface Props {
+  refs: Ref[];
+  handles: Map<string, string | null | undefined>;
+}
+
+const { refs, handles } = Astro.props;
+
+const label = (ref: Ref) => {
+  if (ref.kind === 'link') return ref.target.replace(/^https?:\/\//, '');
+  const did = didOf(ref.target);
+  const who = handles.get(did) ? `@${handles.get(did)}` : did;
+  const [, collection, rkey] = ref.target.startsWith('at://') ? ref.target.slice(5).split('/') : [];
+  return collection ? `${who} · ${collection.split('.').pop()} ${rkey ?? ''}` : who;
+};
+---
+
+<ul class="refs">
+  {refs.map((ref) => <li><span class="role">{ref.role}</span><span><Ext href={ref.web}>{label(ref)}</Ext></span></li>)}
+</ul>
+
+<style>
+  .refs { list-style: none; margin: var(--space-sm) 0 0; padding: 0; display: grid; gap: var(--space-2xs); }
+  li { display: grid; grid-template-columns: var(--role-col) minmax(0, 1fr); align-items: baseline; gap: var(--space-sm); font-size: var(--text-sm); }
+  .role { text-transform: uppercase; font-size: var(--text-2xs); letter-spacing: var(--track); }
+  li :global(a) { overflow-wrap: anywhere; }
+  @media (--narrow) {
+    li { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  }
+</style>

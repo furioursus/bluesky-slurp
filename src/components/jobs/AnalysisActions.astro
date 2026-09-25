@@ -1,0 +1,32 @@
+---
+import Cell from '../ui/Cell.astro';
+import Grid from '../ui/Grid.astro';
+import JobRunner from './JobRunner.astro';
+import ToneControls from './ToneControls.astro';
+
+interface Props {
+  handle: string;
+  snapshot: string;
+  hasTone: boolean;
+}
+
+const { handle, snapshot, hasTone } = Astro.props;
+---
+
+<JobRunner mode="analyze" input={handle} snapshot={snapshot} after="reload">
+  <form>
+    <Grid cols="side">
+      <Cell stack="sm">
+        <h2 class="subtitle">{hasTone ? 'Re-run' : 'Tone pass'}</h2>
+        <p class="muted">Structural analysis is free. The tone pass asks Claude to label replies and quotes, and only pays for posts it hasn’t labelled yet.</p>
+      </Cell>
+      <Cell stack="sm">
+        <ToneControls withToggle={false} />
+        <div class="btn-row">
+          <button class="btn solid" type="submit" name="tone" value="1">{hasTone ? 'Update tone pass' : 'Run tone pass'}</button>
+          <button class="btn" type="submit" name="tone" value="0">Re-run analysis only</button>
+        </div>
+      </Cell>
+    </Grid>
+  </form>
+</JobRunner>

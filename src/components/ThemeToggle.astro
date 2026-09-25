@@ -1,0 +1,43 @@
+<button class="theme-toggle" type="button" aria-label="Toggle day and night mode">
+  <span class="label">day</span>
+  <span class="dot" aria-hidden="true"></span>
+</button>
+
+<script>
+  const toggle = document.querySelector<HTMLButtonElement>('.theme-toggle')!;
+  const root = document.documentElement;
+  const isDark = () => root.dataset.theme === 'dark' || (!root.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+  const sync = () => (toggle.querySelector('.label')!.textContent = isDark() ? 'night' : 'day');
+  toggle.addEventListener('click', () => {
+    const next = isDark() ? 'light' : 'dark';
+    root.dataset.theme = next;
+    try { localStorage.setItem('slurp-theme', next); } catch {}
+    sync();
+  });
+  sync();
+</script>
+
+<style>
+  .theme-toggle {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    z-index: 10;
+    width: var(--toggle-w);
+    height: var(--toggle-h);
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: var(--space-2xs);
+    padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    border: var(--line) solid var(--ink);
+    border-left: 0;
+    border-bottom: 0;
+    font: 300 var(--text-xs) var(--font);
+    cursor: pointer;
+  }
+  .dot { width: var(--box); height: var(--box); border: var(--line) solid var(--ink); display: grid; place-content: center; }
+  .dot::after { content: ''; width: var(--box-mark); height: var(--box-mark); border-radius: 50%; background: var(--ink); }
+</style>

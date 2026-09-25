@@ -1,0 +1,51 @@
+---
+import CollectionList from '../../../../../components/records/CollectionList.astro';
+import Pager from '../../../../../components/records/Pager.astro';
+import RecordCard from '../../../../../components/records/RecordCard.astro';
+import RootsToggle from '../../../../../components/records/RootsToggle.astro';
+import Cell from '../../../../../components/ui/Cell.astro';
+import Grid from '../../../../../components/ui/Grid.astro';
+import AccountLayout from '../../../../../layouts/AccountLayout.astro';
+import { getHandles, getPosts } from '../../../../../lib/appview.ts';
+import { loadSnapshot, readRecords } from '../../../../../lib/archives.ts';
+import { didOf, embedTargets, ROOTS_COOKIE } from '../../../../../lib/ui.ts';
+
+const PAGE = 50;
+const POSTS = 'app.bsky.feed.post';
+
+const { handle = '', snapshot = '', collection: requested } = Astro.params;
+const snap = await loadSnapshot(handle, snapshot);
+const counts: Record<string, number> = snap?.manifest.counts ?? {};
+const collection = requested ?? (POSTS in counts ? POSTS : Object.keys(counts)[0]);
+const unknown = !!snap && !!collection && !(collection in counts);
+if (unknown) Astro.response.status = 404;
+const offset = Math.max(0, Number(Astro.url.searchParams.get('offset')) || 0);
+const order = Astro.url.searchParams.get('order') === 'oldest' ? 'oldest' : 'newest';
+const showRoots = Astro.cookies.get(ROOTS_COOKIE)?.value === '1';
+const base = `/a/${handle}/${snapshot}/records`;
+
+const page = snap && collection && !unknown ? await readRecords(snap.dir, collection, offset, PAGE, order) : null;
+const records = page?.records ?? [];
+const pointers = records.flatMap((rec) => rec.refs.filter((x) => x.kind !== 'blob'));
+const [posts, handles] = await Promise.all([
+  getPosts(records.flatMap((rec) => embedTargets(rec.refs.filter((x) => x.kind !== 'blob'), showRoots).map((x) => x.target))),
+  getHandles(pointers.filter((x) => x.kind === 'record' || x.kind === 'account').map((x) => didOf(x.target))),
+]);
+const href = (o: number, ord: 'newest' | 'oldest' = order) => `${base}/${collection}?offset=${o}&order=${ord}`;
+---
+
+<AccountLayout snap={snap} tab="records">
+  <Grid cols="side">
+    <Cell flush><CollectionList counts={counts} current={collection} base={base} /></Cell>
+    <Cell flush>
+      <Cell stack="sm" divided>
+        <h2 class="subtitle break case-normal">{collection ?? 'No records'}</h2>
+        {unknown && <p class="notice">This snapshot has no {collection} collection. Pick one from the list.</p>}
+        {collection === POSTS && <RootsToggle checked={showRoots} />}
+        {page && <Pager href={href} offset={offset} limit={PAGE} total={page.total} order={order} />}
+      </Cell>
+      {records.map((rec) => <RecordCard handle={handle} rec={rec} posts={posts} handles={handles} showRoots={showRoots} />)}
+      {page && records.length > 5 && <Cell><Pager href={href} offset={offset} limit={PAGE} total={page.total} order={order} /></Cell>}
+    </Cell>
+  </Grid>
+</AccountLayout>

@@ -1,0 +1,49 @@
+---
+import type { PostView } from '../../lib/appview.ts';
+import type { RecordLine } from '../../lib/archives.ts';
+import { when } from '../../lib/format.ts';
+import { EMBED_KICKER, embedTargets } from '../../lib/ui.ts';
+import Ext from '../ui/Ext.astro';
+import MediaThumbs from './MediaThumbs.astro';
+import PostEmbed from './PostEmbed.astro';
+import RefList from './RefList.astro';
+
+interface Props {
+  handle: string;
+  rec: RecordLine;
+  posts: Map<string, PostView | null | undefined>;
+  handles: Map<string, string | null | undefined>;
+  showRoots: boolean;
+}
+
+const { handle, rec, posts, handles, showRoots } = Astro.props;
+const r = rec.record;
+const text = [r.text, r.description, r.displayName].find((v) => typeof v === 'string') ?? null;
+const media = rec.refs.filter((x) => x.kind === 'blob');
+const pointers = rec.refs.filter((x) => x.kind !== 'blob');
+---
+
+<article class="record">
+  <div class="head">
+    <span><strong>{when(rec.createdAt)}</strong> <span class="mono muted">{rec.rkey}</span></span>
+    <Ext href={rec.web}>Open ↗</Ext>
+  </div>
+  {text && <p class="text">{text}</p>}
+  {pointers.length > 0 && <RefList refs={pointers} handles={handles} />}
+  {embedTargets(pointers, showRoots).map((x) => <PostEmbed kicker={EMBED_KICKER[x.role]} uri={x.target} post={posts.get(x.target)} />)}
+  {media.length > 0 && <MediaThumbs handle={handle} media={media} images={r.embed?.images} />}
+  <details class="raw">
+    <summary>Record JSON</summary>
+    <pre>{JSON.stringify(rec, null, 2)}</pre>
+  </details>
+</article>
+
+<style>
+  .record { border-bottom: var(--line) solid var(--ink); padding: var(--pad); }
+  .record:last-child { border-bottom: 0; }
+  .head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-xs) var(--space-md); font-size: var(--text-xs); }
+  .text { font-size: var(--text-lg); margin-top: var(--space-sm); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .raw { margin-top: var(--space-sm); }
+  summary { cursor: pointer; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--track); }
+  pre { font-family: var(--mono); font-size: var(--text-2xs); overflow: auto; max-height: var(--scroll-box); border: var(--line) solid var(--ink); padding: var(--space-sm); margin: var(--space-xs) 0 0; }
+</style>

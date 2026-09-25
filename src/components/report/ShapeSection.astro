@@ -1,0 +1,55 @@
+---
+import type { Report, WindowKey, WindowReport } from '../../lib/analyze.ts';
+import { day, fmt, pct, shortDate } from '../../lib/format.ts';
+import Cell from '../ui/Cell.astro';
+import Grid from '../ui/Grid.astro';
+import Section from '../ui/Section.astro';
+import HoursChart from './HoursChart.astro';
+
+interface Props {
+  report: Report;
+  windowKey: WindowKey;
+}
+
+const { report: r, windowKey } = Astro.props;
+const W = r.byWindow[windowKey];
+const s = W.shape;
+const cols = windowKey === 'all' ? [r.byWindow.all] : [W, r.byWindow.all];
+const withShare = (count: number, share: number | null) => `${fmt(count)} (${pct(share)})`;
+const rows: [string, (x: WindowReport) => string][] = [
+  ['Posts', (x) => fmt(x.shape.posts)],
+  ['Original', (x) => fmt(x.shape.original)],
+  ['Self-threads', (x) => fmt(x.shape.selfThreads)],
+  ['Replies to others', (x) => withShare(x.shape.repliesToOthers, x.shape.pctRepliesToOthers)],
+  ['Quotes', (x) => withShare(x.shape.quotesOfOthers, x.shape.pctQuotes)],
+  ['Aimed at non-followed', (x) => pct(x.shape.pctOutwardToNonFollowed)],
+  ['Cold (never liked either)', (x) => pct(x.shape.pctOutwardToStrangers)],
+];
+const counts: [string, number | null][] = [
+  ['Likes', s.likes],
+  ['Reposts', s.reposts],
+  ['Follows', s.follows],
+  ['Blocks', s.blocks],
+  ['Likes per post', s.likesPerPost],
+  ['Posts per active day', s.postsPerActiveDay],
+];
+---
+
+<Section title="Shape" sub={`${W.label}${W.since ? ` (since ${shortDate(W.since)})` : ''} · snapshot ${day(r.account.snapshot)} · first post ${day(r.account.firstPost)}`}>
+  <Grid cols="2">
+    <Cell>
+      <table class="data">
+        <thead><tr><th></th>{cols.map((c) => <th class="num">{c.label}</th>)}</tr></thead>
+        <tbody>
+          {rows.map(([label, get]) => <tr><td>{label}</td>{cols.map((c) => <td class="num">{get(c)}</td>)}</tr>)}
+        </tbody>
+      </table>
+    </Cell>
+    <Cell stack="lg">
+      <div class="split">
+        {counts.map(([k, v]) => <div><p class="kicker">{k}</p><p class="subtitle">{fmt(v)}</p></div>)}
+      </div>
+      <HoursChart hours={s.postsByHourUTC} />
+    </Cell>
+  </Grid>
+</Section>

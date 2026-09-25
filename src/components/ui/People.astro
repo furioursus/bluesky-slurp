@@ -1,0 +1,29 @@
+---
+import type { Person } from '../../lib/analyze.ts';
+import { fmt } from '../../lib/format.ts';
+import Ext from './Ext.astro';
+
+interface Props {
+  people: Person[];
+}
+
+const { people } = Astro.props;
+---
+
+{
+  people.length ? (
+    <ol class="ranked">
+      {people.map((p) => (
+        <li>
+          <span class="who">
+            <Ext href={p.web}>{p.handle ? `@${p.handle}` : p.did}</Ext>
+            {!p.followed && <span class="tag">not followed</span>}
+          </span>
+          <span class="count">{fmt(p.count)}</span>
+        </li>
+      ))}
+    </ol>
+  ) : (
+    <p class="muted">None</p>
+  )
+}

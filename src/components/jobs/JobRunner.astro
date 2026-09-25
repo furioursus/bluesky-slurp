@@ -1,0 +1,169 @@
+---
+interface Props {
+  mode: 'archive' | 'analyze';
+  input?: string;
+  snapshot?: string;
+  after: 'open' | 'reload';
+}
+
+const { mode, input, snapshot, after } = Astro.props;
+---
+
+<job-runner data-mode={mode} data-input={input} data-snapshot={snapshot} data-after={after}>
+  <slot />
+  <div data-panel-slot></div>
+  <template>
+    <section class="grid job">
+      <div class="cell stack">
+        <div class="status-line">
+          <h3 class="subtitle" data-title></h3>
+          <span class="kicker" data-status>starting</span>
+        </div>
+        <pre class="log" aria-live="polite" data-log></pre>
+      </div>
+      <div class="cell span-all flush" data-prompt hidden>
+        <div class="grid cols-4">
+          <div class="cell stack"><p class="kicker">Tone pass estimate</p><p class="big-number" data-cost></p></div>
+          <div class="cell stack"><p class="kicker">Input tokens (exact)</p><p class="big-number" data-input-tokens></p></div>
+          <div class="cell stack"><p class="kicker">Output tokens (range)</p><p class="subtitle" data-output-tokens></p></div>
+          <div class="cell stack"><p class="kicker" data-requests></p><p class="mono" data-model></p></div>
+          <div class="cell span-all btn-row">
+            <button class="btn solid" type="button" data-answer="yes">Proceed</button>
+            <button class="btn" type="button" data-answer="no">Skip tone pass</button>
+          </div>
+        </div>
+      </div>
+      <div class="cell span-all" data-finish hidden>
+        <a class="btn solid" data-open hidden></a>
+        <button class="btn solid" type="button" data-reload hidden>Show the report</button>
+      </div>
+    </section>
+  </template>
+</job-runner>
+
+<script>
+  import { fmt, money, plural } from '../../lib/format.ts';
+
+  type JobEvent = { type: 'log' | 'estimate' | 'done' | 'error'; data: any };
+
+  class JobRunner extends HTMLElement {
+    connectedCallback() {
+      this.querySelector('form')?.addEventListener('submit', (e) => this.start(e as SubmitEvent));
+    }
+
+    async start(e: SubmitEvent) {
+      e.preventDefault();
+      const form = e.target as HTMLFormElement;
+      const fd = new FormData(form);
+      const submitter = e.submitter as HTMLButtonElement | null;
+      const { mode, input, snapshot, after } = this.dataset;
+      const request = {
+        mode,
+        input: input ?? String(fd.get('input') ?? ''),
+        snapshot,
+        media: fd.has('media'),
+        analyze: fd.has('analyze'),
+        tone: submitter?.name === 'tone' ? submitter.value === '1' : fd.has('tone'),
+        model: fd.get('model'),
+        toneLimit: Number(fd.get('toneLimit') ?? 200),
+      };
+      for (const b of form.querySelectorAll('button')) b.disabled = true;
+
+      const panel = (this.querySelector('template')!.content.firstElementChild as HTMLElement).cloneNode(true) as HTMLElement;
+      const $ = <T extends HTMLElement>(sel: string) => panel.querySelector<T>(sel)!;
+      $('[data-title]').textContent = `${mode === 'archive' ? 'Archiving' : 'Analyzing'} ${request.input}`;
+      this.querySelector('[data-panel-slot]')!.replaceChildren(panel);
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      const status = (text: string) => ($('[data-status]').textContent = text);
+      const log = $('[data-log]');
+      const append = (line: string) => {
+        const span = document.createElement('span');
+        if (/⚠|error/.test(line)) span.className = 'warn';
+        span.textContent = `${line}\n`;
+        log.append(span);
+        log.scrollTop = log.scrollHeight;
+      };
+      const finish = () => {
+        for (const b of form.querySelectorAll('button')) b.disabled = false;
+      };
+
+      const res = await fetch('/api/jobs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        append(`error: ${body.error ?? res.status}`);
+        status('failed');
+        return finish();
+      }
+      status('running');
+
+      const events = new EventSource(`/api/jobs/${body.id}/events`);
+      events.onmessage = (msg) => {
+        const ev: JobEvent = JSON.parse(msg.data);
+        if (ev.type === 'log') append(ev.data);
+        if (ev.type === 'estimate') this.showEstimate(panel, body.id, ev.data, status);
+        if (ev.type === 'error') {
+          append(`error: ${ev.data}`);
+          status('failed');
+          events.close();
+          finish();
+        }
+        if (ev.type === 'done') {
+          status('done');
+          events.close();
+          finish();
+          $('[data-finish]').hidden = false;
+          if (after === 'open') {
+            const open = $<HTMLAnchorElement>('[data-open]');
+            open.href = `/a/${ev.data.handle}/${ev.data.snapshot}/report`;
+            open.textContent = `Open ${ev.data.handle}`;
+            open.hidden = false;
+          } else {
+            const reload = $('[data-reload]');
+            reload.hidden = false;
+            reload.addEventListener('click', () => location.reload());
+          }
+        }
+      };
+    }
+
+    showEstimate(panel: HTMLElement, id: string, e: any, status: (t: string) => void) {
+      const $ = (sel: string) => panel.querySelector<HTMLElement>(sel)!;
+      status('waiting for you');
+      $('[data-cost]').textContent = e.costLow == null ? 'no price on file' : `${money(e.costLow)} – ${money(e.costHigh)}`;
+      $('[data-input-tokens]').textContent = fmt(e.inputTokens);
+      $('[data-output-tokens]').textContent = `${fmt(e.outputLow)} – ${fmt(e.outputHigh)}`;
+      $('[data-requests]').textContent = `${plural(e.posts, 'post')} · ${plural(e.requests, 'request')}`;
+      $('[data-model]').textContent = e.model;
+      const prompt = $('[data-prompt]');
+      prompt.hidden = false;
+      for (const button of prompt.querySelectorAll<HTMLButtonElement>('[data-answer]')) {
+        button.onclick = async () => {
+          const yes = button.dataset.answer === 'yes';
+          prompt.hidden = true;
+          status(yes ? 'labelling' : 'finishing');
+          await fetch(`/api/jobs/${id}/confirm`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ yes }) });
+        };
+      }
+      prompt.querySelector<HTMLButtonElement>('[data-answer="yes"]')!.focus();
+    }
+  }
+
+  customElements.define('job-runner', JobRunner);
+</script>
+
+<style>
+  job-runner { display: block; }
+  .status-line { display: flex; justify-content: space-between; gap: var(--space-md); align-items: baseline; }
+  .log {
+    font-family: var(--mono);
+    font-size: var(--text-xs);
+    line-height: var(--leading);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    max-height: var(--scroll-box);
+    overflow: auto;
+    margin: 0;
+  }
+  .log :global(.warn) { font-weight: 700; }
+</style>

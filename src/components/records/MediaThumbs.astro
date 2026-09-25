@@ -1,0 +1,28 @@
+---
+import type { Ref } from '../../lib/refs.ts';
+import Ext from '../ui/Ext.astro';
+
+interface Props {
+  handle: string;
+  media: Ref[];
+  images: any[] | undefined;
+}
+
+const { handle, media, images } = Astro.props;
+const src = (x: Ref) => (x.local ? `/blobs/${handle}/${x.local.split('/').pop()}` : x.web);
+const alt = (x: Ref) => images?.find((i) => i.image?.ref?.$link === x.target)?.alt || '';
+---
+
+<div class="thumbs">
+  {
+    media.map((x) =>
+      x.mimeType?.startsWith('video/') ? (
+        x.local ? <video src={src(x)} controls preload="metadata" /> : <Ext href={x.web}><span class="chip">video ↗</span></Ext>
+      ) : x.mimeType?.startsWith('image/') ? (
+        <Ext href={src(x)}><img src={src(x)} alt={alt(x)} loading="lazy" /></Ext>
+      ) : (
+        <Ext href={x.web}><span class="chip">{x.mimeType ?? 'blob'} ↗</span></Ext>
+      ),
+    )
+  }
+</div>

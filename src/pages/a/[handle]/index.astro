@@ -1,0 +1,14 @@
+---
+import EmptyState from '../../../components/ui/EmptyState.astro';
+import Base from '../../../layouts/Base.astro';
+import { listAccounts } from '../../../lib/archives.ts';
+
+const { handle } = Astro.params;
+const account = (await listAccounts()).find((a) => a.handle === handle);
+if (account) return Astro.redirect(`/a/${account.handle}/${account.snapshots[0].snapshot}/report`);
+Astro.response.status = 404;
+---
+
+<Base title="Not archived" nav="accounts">
+  <EmptyState title="Not archived"><a class="btn solid" href="/">Archive it</a></EmptyState>
+</Base>

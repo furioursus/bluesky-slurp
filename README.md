@@ -15,27 +15,51 @@
 
 ## Usage
 
-**TL;DR:** Node ≥ 23.6, `npm install`, then run `src/cli.ts` directly, or use `npm run slurp -- <args>`, which also loads `.env`. There's no build step.
+**TL;DR:** Node ≥ 23.6, `npm install`. The CLI runs directly with no build (`npm run slurp -- <args>`, which also loads `.env`). The web UI is Astro: `npm run dev`.
 
 ```sh
 npm install
-node src/cli.ts furioursus.dev                  # records only (fast: ~30 MB / 65k records in ~4s)
-node src/cli.ts furioursus.dev --media          # + images/video (can be GBs; ~8 files/s)
-node src/cli.ts furioursus.dev --analyze        # archive, then write the report
-node src/cli.ts analyze furioursus.dev          # report on the latest existing snapshot
-node src/cli.ts analyze furioursus.dev --tone   # + Claude tone pass (estimate, then asks)
+npm run slurp -- furioursus.dev                   # records only (fast: ~30 MB / 65k records in ~4s)
+npm run slurp -- furioursus.dev --media           # + images/video (can be GBs; ~8 files/s)
+npm run slurp -- furioursus.dev --analyze         # archive, then write the report
+npm run slurp -- analyze furioursus.dev           # report on the latest existing snapshot
+npm run slurp -- analyze furioursus.dev --tone    # + Claude tone pass (estimate, then asks)
 ```
 
 Input can be a handle, `@handle`, a DID (`did:plc:…` / `did:web:…`), an `at://` URI, or a `bsky.app/profile/…` URL. `--out <dir>` changes the archive root (default `./archives`).
 
 ## Web UI
 
-**TL;DR:** `npm run serve` → http://127.0.0.1:4747. It's the same engine as the CLI in a brutalist browser UI: archive an account, read the report, browse every record with its pointers, and approve the tone-pass estimate with a button.
+**TL;DR:** `npm run dev` → http://127.0.0.1:4747. It's an Astro 7 app rendered on the server over the same engine as the CLI: archive an account, read the report, browse every record with its pointers, and approve the tone-pass estimate with a button. Details in [docs/web-ui.md](docs/web-ui.md).
+
+| command | what it does |
+|---|---|
+| `npm run dev` | Astro dev server on 127.0.0.1:4747, loads `.env` |
+| `npm run dev:inspect` | same, plus the astro-pathfinder component inspector (see below) |
+| `npm run serve` | production build, then the built Node server on 127.0.0.1:4747 |
+| `npm run check` | `astro check`: types for `.astro` and `src/lib` |
 
 - **Local only:** it binds to `127.0.0.1` and rejects cross-origin POSTs, because it writes to disk and can spend Claude credits. Your API key stays server-side in `.env`.
-- **Screens:** New archive (form, then a live log), Accounts, and per account: Report / Records / Identity. Records are grouped by app, 50 per page, newest first. Media shows from `blobs/` when downloaded, otherwise images load from the PDS.
-- **Flags:** `npm run serve -- --port 5000 --out other-archives`.
-- **No build step:** `web/` is plain HTML, CSS and an ES module. Archived text is inserted as text, never as HTML.
+- **Screens:** New archive (form, then a live log), Accounts, and per account: Report / Records / Identity. Pages are real URLs, e.g. `/a/<handle>/<snapshot>/report?w=30d`.
+- **Archive location:** `SLURP_ARCHIVES=/path npm run dev` points the UI at another archive root (default `./archives`).
+
+### Component inspector (astro-pathfinder)
+
+**TL;DR:** `npm run dev:inspect`, then hover anything. A panel in the bottom-left names the `.astro` files that produced it, innermost first, each with a line number and clickable.
+
+```
+src/components/records/PostEmbed.astro:44
+src/components/records/RecordCard.astro:24
+src/components/ui/Cell.astro:14
+src/components/ui/Grid.astro:10
+src/layouts/Base.astro:14
+src/layouts/AccountLayout.astro:17
+src/pages/a/[handle]/[snapshot]/records/[...collection].astro:35
+```
+
+- **Limits:** content injected with `set:html` has no line of its own (this project doesn't use it). Framework components without a `client:*` directive can't be named (this project has none).
+- **Why it exists:** Astro 7 compiles through `@astrojs/compiler-rs`, which accepts `annotateSourceFile` but emits nothing, so the dev toolbar's built-in source annotation is silently gone.
+- **Install:** a devDependency pinned to the `v1.0.0` HTTPS tarball of `furioursus/astro-pathfinder`, not a `github:` spec (which locks as `git+ssh`). It's a no-op unless `INSPECT=1` and the command is `dev`. An `INSPECT=1` build was verified to contain no markers.
 
 ## What gets archived
 

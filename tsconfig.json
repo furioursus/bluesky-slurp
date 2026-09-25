@@ -1,15 +1,9 @@
 {
+  "extends": "astro/tsconfigs/strict",
   "compilerOptions": {
-    "target": "es2024",
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "strict": true,
-    "noEmit": true,
-    "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
-    "verbatimModuleSyntax": true,
-    "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src"]
+  "include": [".astro/types.d.ts", "src", "astro.config.mjs", "postcss.config.mjs"],
+  "exclude": ["dist", "archives"]
 }

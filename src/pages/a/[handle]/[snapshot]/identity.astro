@@ -1,0 +1,72 @@
+---
+import Cell from '../../../../components/ui/Cell.astro';
+import Ext from '../../../../components/ui/Ext.astro';
+import Grid from '../../../../components/ui/Grid.astro';
+import AccountLayout from '../../../../layouts/AccountLayout.astro';
+import { loadIdentity, loadSnapshot } from '../../../../lib/archives.ts';
+import { day, fmt } from '../../../../lib/format.ts';
+
+const PLC_OPS_SHOWN = 12;
+
+const { handle = '', snapshot = '' } = Astro.params;
+const snap = await loadSnapshot(handle, snapshot);
+const m = snap?.manifest;
+const id = snap ? await loadIdentity(snap.dir) : null;
+const services: any[] = id?.didDocument?.service ?? [];
+const ops = [...(id?.plcAuditLog ?? [])].reverse();
+---
+
+<AccountLayout snap={snap} tab="identity">
+  {
+    m && (
+      <>
+        <Grid cols="2">
+          <Cell stack="sm">
+            <h2 class="title">Identity</h2>
+            <table class="data">
+              <tbody>
+                <tr><th class="wide">DID</th><td class="break"><span class="mono">{m.did}</span></td></tr>
+                <tr><th class="wide">Handle</th><td class="break">@{m.handle}</td></tr>
+                <tr><th class="wide">Handle verifies</th><td>{m.handleVerified ? 'Yes, both directions' : 'No'}</td></tr>
+                <tr><th class="wide">PDS</th><td class="break"><Ext href={m.pds}>{m.pds}</Ext></td></tr>
+                <tr><th class="wide">Self-labels</th><td>{m.selfLabels.length ? m.selfLabels.join(', ') : 'None'}</td></tr>
+                {m.did.startsWith('did:plc:') && <tr><th class="wide">PLC log</th><td><Ext href={`https://plc.directory/${m.did}/log/audit`}>plc.directory ↗</Ext></td></tr>}
+              </tbody>
+            </table>
+          </Cell>
+          <Cell stack="sm">
+            <h2 class="title">Handle history</h2>
+            {m.handleHistory?.length ? (
+              <ol class="ranked">
+                {[...m.handleHistory].reverse().map((x: any) => <li><span class="who">@{x.handle}</span><span class="count muted">{day(x.since)}</span></li>)}
+              </ol>
+            ) : (
+              <p class="muted">Only available for did:plc accounts.</p>
+            )}
+          </Cell>
+        </Grid>
+        <Grid cols="2">
+          <Cell stack="sm">
+            <h3 class="subtitle">Services</h3>
+            <table class="data">
+              <tbody>{services.map((s) => <tr><th class="wide">{s.id}</th><td class="break">{s.type} · {s.serviceEndpoint}</td></tr>)}</tbody>
+            </table>
+          </Cell>
+          <Cell stack="sm">
+            <h3 class="subtitle">PLC operations: {fmt(ops.length)}</h3>
+            {ops.length > 0 && (
+              <ol class="ranked">
+                {ops.slice(0, PLC_OPS_SHOWN).map((op) => (
+                  <li>
+                    <span class="who">{op.operation?.type ?? 'op'}{op.nullified && <span class="tag">nullified</span>}</span>
+                    <span class="count muted">{day(op.createdAt)}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Cell>
+        </Grid>
+      </>
+    )
+  }
+</AccountLayout>

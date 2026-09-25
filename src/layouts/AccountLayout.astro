@@ -1,0 +1,36 @@
+---
+import AccountHeader from '../components/account/AccountHeader.astro';
+import EmptyState from '../components/ui/EmptyState.astro';
+import Tabs from '../components/ui/Tabs.astro';
+import { listAccounts, type Snapshot } from '../lib/archives.ts';
+import Base from './Base.astro';
+
+interface Props {
+  snap: Snapshot | null;
+  tab: 'report' | 'records' | 'identity';
+}
+
+const { snap, tab } = Astro.props;
+const account = snap && (await listAccounts()).find((a) => a.handle === snap.handle);
+if (!snap || !account) Astro.response.status = 404;
+const base = snap ? `/a/${snap.handle}/${snap.snapshot}` : '';
+---
+
+<Base title={snap?.manifest.handle ?? 'Not archived'} nav="accounts">
+  {
+    snap && account ? (
+      <>
+        <AccountHeader snap={snap} account={account} tab={tab} />
+        <Tabs
+          label="Account sections"
+          items={(['report', 'records', 'identity'] as const).map((t) => ({ href: `${base}/${t}`, label: t, current: t === tab }))}
+        />
+        <slot />
+      </>
+    ) : (
+      <EmptyState title="Not archived">
+        <a class="btn solid" href="/">Archive it</a>
+      </EmptyState>
+    )
+  }
+</Base>

@@ -1,0 +1,48 @@
+---
+import { fmt } from '../../lib/format.ts';
+
+interface Props {
+  counts: Record<string, number>;
+  current: string | undefined;
+  base: string;
+}
+
+const { counts, current, base } = Astro.props;
+const groups = new Map<string, [string, number][]>();
+for (const [c, n] of Object.entries(counts)) {
+  const ns = c.split('.').slice(0, 2).reverse().join('.');
+  groups.set(ns, [...(groups.get(ns) ?? []), [c, n]]);
+}
+---
+
+<div class="cell stack">
+  <h2 class="subtitle">Collections</h2>
+  <p class="muted">{Object.keys(counts).length} across {groups.size} apps</p>
+</div>
+<ul class="collections">
+  {
+    [...groups].map(([ns, items]) => (
+      <>
+        <li class="ns">{ns}</li>
+        {items.map(([c, n]) => (
+          <li>
+            <a href={`${base}/${c}`} aria-current={c === current ? 'page' : undefined}>
+              <span class="break">{c.split('.').slice(2).join('.')}</span>
+              <span>{fmt(n)}</span>
+            </a>
+          </li>
+        ))}
+      </>
+    ))
+  }
+</ul>
+
+<style>
+  .collections { list-style: none; margin: 0; padding: 0; max-height: var(--panel); overflow: auto; }
+  a { display: flex; justify-content: space-between; gap: var(--space-sm); padding: var(--space-xs) var(--pad); text-decoration: none; font-family: var(--mono); font-size: var(--text-xs); border-bottom: var(--line) solid var(--faint); }
+  a:hover, a[aria-current='page'] { background: var(--ink); color: var(--paper); }
+  .ns { padding: var(--space-md) var(--pad) var(--space-xs); font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: var(--track-wide); color: var(--muted); }
+  @media (--narrow) {
+    .collections { max-height: var(--panel-sm); }
+  }
+</style>

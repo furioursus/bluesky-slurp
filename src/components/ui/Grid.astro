@@ -1,0 +1,12 @@
+---
+import type { HTMLAttributes } from 'astro/types';
+
+interface Props extends HTMLAttributes<'section'> {
+  cols?: '2' | '3' | '4' | 'side';
+  as?: 'section' | 'div' | 'header';
+}
+
+const { cols, as: Tag = 'section', class: className, ...rest } = Astro.props;
+---
+
+<Tag class:list={['grid', cols && `cols-${cols}`, className]} {...rest}><slot /></Tag>

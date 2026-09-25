@@ -1,6 +1,6 @@
 # Analysis
 
-**TL;DR:** offline, structural signals of good- or bad-faith engagement, computed for five time windows, each with links to the posts behind it. It never outputs a verdict. Code: `src/analyze.ts`.
+**TL;DR:** offline, structural signals of good- or bad-faith engagement, computed for five time windows, each with links to the posts behind it. It never outputs a verdict. Code: `src/lib/analyze.ts`.
 
 ## Signals, not verdicts
 

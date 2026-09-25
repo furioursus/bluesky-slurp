@@ -1,0 +1,57 @@
+---
+import Grid from './ui/Grid.astro';
+
+interface Props {
+  current?: 'home' | 'accounts' | 'about';
+}
+
+const { current } = Astro.props;
+const links = [
+  { key: 'home', href: '/', label: 'New archive' },
+  { key: 'accounts', href: '/accounts', label: 'Accounts' },
+  { key: 'about', href: '/about', label: 'About' },
+] as const;
+---
+
+<Grid as="header" class="masthead">
+  <a class="cell wordmark" href="/" aria-label="Slurp home">SLURP</a>
+  <nav class="cell nav" aria-label="Main">
+    {links.map((l) => <a href={l.href} aria-current={l.key === current ? 'page' : undefined}>{l.label}</a>)}
+  </nav>
+  <div class="cell tagline"><p>Everything an account has put on the atmosphere, on your disk.</p></div>
+</Grid>
+
+<style>
+  .masthead { grid-template-columns: minmax(0, 2fr) minmax(0, 0.8fr) minmax(0, 0.8fr); }
+  .wordmark {
+    display: flex;
+    align-items: center;
+    font-size: var(--text-wordmark);
+    letter-spacing: var(--track-wordmark);
+    line-height: 1;
+    text-decoration: none;
+    padding-block: var(--pad);
+    overflow: hidden; /* see docs/web-ui.md#design */
+  }
+  .nav { display: grid; padding: 0; gap: var(--line); background: var(--ink); }
+  .nav a {
+    background: var(--paper);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--pad);
+    text-decoration: none;
+    text-transform: uppercase;
+    font-size: var(--text-sm);
+    letter-spacing: var(--track);
+    min-height: var(--control);
+  }
+  .nav a:hover, .nav a[aria-current='page'] { background: var(--ink); color: var(--paper); }
+  .tagline { display: flex; align-items: center; justify-content: center; text-align: center; text-transform: uppercase; font-size: var(--text-sm); letter-spacing: var(--track); }
+
+  @media (--narrow) {
+    .masthead { grid-template-columns: minmax(0, 1fr); }
+    .nav { grid-auto-flow: column; }
+    .nav a { justify-content: center; padding: 0 var(--space-xs); }
+    .tagline { display: none; }
+  }
+</style>

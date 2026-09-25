@@ -1,0 +1,64 @@
+---
+import type { AccountSummary, Snapshot } from '../../lib/archives.ts';
+import { fmt, stamp, when } from '../../lib/format.ts';
+import Cell from '../ui/Cell.astro';
+import Ext from '../ui/Ext.astro';
+import Grid from '../ui/Grid.astro';
+
+interface Props {
+  snap: Snapshot;
+  account: AccountSummary;
+  tab: string;
+}
+
+const { snap, account, tab } = Astro.props;
+const { manifest: m, profile: p } = snap;
+---
+
+<Grid class="account-head">
+  <Cell flush>{p?.avatar ? <img class="avatar lg" src={p.avatar} alt="" /> : <div class="avatar lg" />}</Cell>
+  <Cell stack="sm">
+    <p class="kicker">{m.handleVerified ? 'Verified handle' : '⚠ Handle does not verify'}</p>
+    <h1 class="title break case-normal">@{m.handle ?? m.did}</h1>
+    {p?.displayName && <p class="subtitle case-normal">{p.displayName}</p>}
+    {p?.description && <p class="muted break prewrap">{p.description}</p>}
+    <p class="mono muted break">{m.did}</p>
+    {m.noUnauthenticated && <p class="notice solid">This account asks apps not to show its posts to logged-out viewers.</p>}
+  </Cell>
+  <Cell stack="sm">
+    <div>
+      <p class="kicker">Records</p>
+      <p class="big-number">{fmt(m.totalRecords)}</p>
+    </div>
+    {p && <p>{fmt(p.followersCount)} followers · {fmt(p.followsCount)} following</p>}
+    <label class="field">
+      <span class="kicker">Snapshot</span>
+      <select class="input small snapshot-picker" aria-label="Snapshot" data-base={`/a/${snap.handle}`} data-tab={tab}>
+        {account.snapshots.map((s) => (
+          <option value={s.snapshot} selected={s.snapshot === snap.snapshot} title={`${when(s.fetchedAt)} · ${fmt(s.totalRecords)} records`}>
+            {stamp(s.fetchedAt)} · {fmt(s.totalRecords)}
+          </option>
+        ))}
+      </select>
+    </label>
+    <div class="btn-row">
+      <Ext href={m.profileUrl}>Bluesky ↗</Ext>
+      <Ext href={`https://pdsls.dev/at://${m.did}`}>Repo ↗</Ext>
+    </div>
+  </Cell>
+</Grid>
+
+<script>
+  for (const picker of document.querySelectorAll<HTMLSelectElement>('.snapshot-picker')) {
+    picker.addEventListener('change', () => (location.href = `${picker.dataset.base}/${picker.value}/${picker.dataset.tab}`));
+  }
+</script>
+
+<style>
+  .account-head { grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr) minmax(0, 1.3fr); }
+  .avatar.lg:hover { filter: none; }
+  @media (--narrow) {
+    .account-head { grid-template-columns: minmax(0, 1fr); }
+    .avatar.lg { width: calc(var(--avatar) * 2); }
+  }
+</style>

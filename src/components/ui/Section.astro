@@ -1,0 +1,19 @@
+---
+import Cell from './Cell.astro';
+import Grid from './Grid.astro';
+
+interface Props {
+  title: string;
+  sub?: string | null;
+}
+
+const { title, sub } = Astro.props;
+---
+
+<Grid cols="side">
+  <Cell stack="sm">
+    <h2 class="title">{title}</h2>
+    {sub && <p class="muted">{sub}</p>}
+  </Cell>
+  <Cell flush><slot /></Cell>
+</Grid>

@@ -1,0 +1,27 @@
+---
+import AccountGrid from '../components/account/AccountGrid.astro';
+import Cell from '../components/ui/Cell.astro';
+import EmptyState from '../components/ui/EmptyState.astro';
+import Grid from '../components/ui/Grid.astro';
+import Base from '../layouts/Base.astro';
+import { listAccounts } from '../lib/archives.ts';
+import { plural } from '../lib/format.ts';
+
+const accounts = await listAccounts();
+---
+
+<Base title="Accounts" nav="accounts">
+  {
+    accounts.length ? (
+      <Grid cols="side">
+        <Cell stack="sm">
+          <h1 class="display">Accounts</h1>
+          <p class="muted">{plural(accounts.length, 'account')} archived</p>
+        </Cell>
+        <Cell flush><AccountGrid accounts={accounts} /></Cell>
+      </Grid>
+    ) : (
+      <EmptyState title="Nothing on disk"><a class="btn solid" href="/">Archive an account</a></EmptyState>
+    )
+  }
+</Base>

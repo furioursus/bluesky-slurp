@@ -4,7 +4,10 @@
     {
       "name": "slurp-ui",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "serve"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 4747,
       "url": "http://127.0.0.1:4747"
     }

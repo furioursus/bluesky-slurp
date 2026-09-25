@@ -1,0 +1,50 @@
+---
+import Cell from '../ui/Cell.astro';
+import Check from '../ui/Check.astro';
+import Grid from '../ui/Grid.astro';
+import JobRunner from './JobRunner.astro';
+import ToneControls from './ToneControls.astro';
+---
+
+<JobRunner mode="archive" after="open">
+  <form>
+    <Grid cols="side">
+      <Cell stack="lg">
+        <h1 class="display">Archive<br />an account</h1>
+        <p class="muted">Every public record from every app on the atmosphere: posts, likes, reposts, follows, blocks, lists, and third-party apps too. Each interaction links straight to its source.</p>
+      </Cell>
+      <Cell stack="lg">
+        <label class="field">
+          <span class="kicker">Handle, DID, or bsky.app profile URL</span>
+          <input class="input" name="input" placeholder="handle.bsky.social" autocomplete="off" autocapitalize="off" spellcheck="false" required autofocus aria-label="Handle, DID, or profile URL" />
+        </label>
+        <div class="split">
+          <Check name="media" title="Media" note="Download images and video. Can be gigabytes." />
+          <Check name="analyze" title="Analyze" note="Behavior and interests report. Free, offline." checked />
+        </div>
+        <ToneControls />
+      </Cell>
+    </Grid>
+    <Grid><Cell flush><button class="cta" type="submit"><span>Slurp it</span></button></Cell></Grid>
+  </form>
+</JobRunner>
+
+<style>
+  .cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: var(--cta);
+    border: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font: 400 var(--text-subtitle) var(--font);
+    text-transform: uppercase;
+    letter-spacing: var(--track);
+    cursor: pointer;
+  }
+  .cta span { border-bottom: var(--line) solid currentColor; }
+  .cta:hover span { border-bottom-width: var(--line-bold); }
+  .cta[disabled] { opacity: var(--disabled); cursor: progress; }
+</style>

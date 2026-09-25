@@ -1,0 +1,19 @@
+---
+import EmptyState from '../ui/EmptyState.astro';
+import JobRunner from './JobRunner.astro';
+
+interface Props {
+  handle: string;
+  snapshot: string;
+}
+
+const { handle, snapshot } = Astro.props;
+---
+
+<JobRunner mode="analyze" input={handle} snapshot={snapshot} after="reload">
+  <form>
+    <EmptyState size="title" title="This report predates time windows" body="Re-run the analysis to drill into 30 days, 3 months, 6 months and 1 year. It’s free, takes about a second, and keeps any tone labels.">
+      <button class="btn solid" type="submit">Re-run analysis</button>
+    </EmptyState>
+  </form>
+</JobRunner>

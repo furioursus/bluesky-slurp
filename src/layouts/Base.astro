@@ -1,0 +1,33 @@
+---
+import '../styles/global.css';
+import Masthead from '../components/Masthead.astro';
+import ThemeToggle from '../components/ThemeToggle.astro';
+
+interface Props {
+  title?: string;
+  nav?: 'home' | 'accounts' | 'about';
+}
+
+const { title, nav } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title ? `${title} · Slurp` : 'Slurp'}</title>
+    <meta name="description" content="Archive and read an atproto account's public activity." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600&display=swap" />
+    <script is:inline>
+      try { const t = localStorage.getItem('slurp-theme'); if (t) document.documentElement.dataset.theme = t; } catch {}
+    </script>
+  </head>
+  <body>
+    <Masthead current={nav} />
+    <main id="view"><slot /></main>
+    <ThemeToggle />
+  </body>
+</html>

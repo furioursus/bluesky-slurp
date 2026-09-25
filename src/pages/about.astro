@@ -1,0 +1,28 @@
+---
+import Cell from '../components/ui/Cell.astro';
+import Grid from '../components/ui/Grid.astro';
+import Base from '../layouts/Base.astro';
+
+export const prerender = true;
+
+const items = [
+  ['What’s archived', 'The raw repo (repo.car), every record decoded to JSON, the DID document, handle history, and the Bluesky profile view. Media is optional.'],
+  ['What isn’t', 'DMs, mutes and private preferences, because they aren’t public. Also what other people did to them, since that lives in other people’s repos.'],
+  ['Pointers', 'Every like, repost, reply, quote, follow, block and mention links to its target. The target’s CID pins the exact version, even if it’s later deleted.'],
+  ['Analysis', 'Structural signals with receipts: cold outreach, reply bursts, stranger quotes, interests, across 30 days to all time. Free and offline.'],
+  ['Tone pass', 'Optional and paid. Claude labels replies and quotes in context. You see an exact input-token count and a cost range before anything is spent.'],
+  ['Where it lives', 'Everything is written to ./archives on this machine. This server only listens on 127.0.0.1.'],
+];
+---
+
+<Base title="About" nav="about">
+  <Grid cols="side">
+    <Cell><h1 class="display">About</h1></Cell>
+    <Cell stack="sm">
+      <p class="subtitle case-normal">Slurp downloads an account’s signed repo from its own PDS. That repo is every public record it has written, in every app on the atmosphere.</p>
+    </Cell>
+  </Grid>
+  <Grid cols="3">
+    {items.map(([title, body]) => <Cell stack="sm"><h3 class="subtitle">{title}</h3><p>{body}</p></Cell>)}
+  </Grid>
+</Base>

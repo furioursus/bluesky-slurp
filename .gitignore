@@ -2,3 +2,5 @@ node_modules/
 archives/
 .env
 .claude/settings.local.json
+dist/
+.astro/

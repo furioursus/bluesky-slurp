@@ -1,0 +1,13 @@
+---
+import { fmt } from '../../lib/format.ts';
+
+interface Props {
+  items: { label: string; count: number }[];
+}
+
+const { items } = Astro.props;
+---
+
+<div class="chips">
+  {items.length ? items.map((x) => <span class="chip">{x.label}<b>{fmt(x.count)}</b></span>) : <span class="muted">None</span>}
+</div>

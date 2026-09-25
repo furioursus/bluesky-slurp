@@ -1,0 +1,32 @@
+---
+import type { Report, WindowReport } from '../../lib/analyze.ts';
+import { fmt } from '../../lib/format.ts';
+import Cell from '../ui/Cell.astro';
+import Chips from '../ui/Chips.astro';
+import Grid from '../ui/Grid.astro';
+import People from '../ui/People.astro';
+import Section from '../ui/Section.astro';
+
+interface Props {
+  window: WindowReport;
+  apps: Report['appsUsed'];
+}
+
+const { window: W, apps } = Astro.props;
+const i = W.interests;
+---
+
+<Section title="Interests" sub={W.label}>
+  <Grid cols="2">
+    <Cell stack="sm"><h3 class="subtitle">Hashtags</h3><Chips items={i.hashtags.map((t) => ({ label: `#${t.tag}`, count: t.count }))} /></Cell>
+    <Cell stack="sm"><h3 class="subtitle">Links to</h3><Chips items={i.linkDomains.map((d) => ({ label: d.domain, count: d.count }))} /></Cell>
+    <Cell stack="sm"><h3 class="subtitle">Most liked</h3><People people={i.mostLiked} /></Cell>
+    <Cell stack="sm"><h3 class="subtitle">Most reposted</h3><People people={i.mostReposted} /></Cell>
+    <Cell stack="sm" span>
+      <h3 class="subtitle">Apps on the atmosphere</h3>
+      <p class="muted">All time: record counts don’t carry dates to window by.</p>
+      <Chips items={apps.map((x) => ({ label: x.app, count: x.records }))} />
+    </Cell>
+    <Cell span><p class="muted">Languages: {i.languages.map((l) => `${l.lang} (${fmt(l.count)})`).join(', ') || 'none'}</p></Cell>
+  </Grid>
+</Section>

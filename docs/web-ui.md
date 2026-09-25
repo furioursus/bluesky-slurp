@@ -1,56 +1,79 @@
 # Web UI
 
-**TL;DR:** `npm run serve` runs a local Node server (`src/server.ts`) with a no-build frontend (`web/`). It's local-only on purpose, it renders untrusted archived text safely, and long jobs stream over SSE with a confirm step for paid work.
+**TL;DR:** an Astro 7 app rendered on the server by the Node adapter (`npm run dev`, `npm run serve`). Pages read archives straight from disk and arrive fully rendered. The browser only runs JavaScript for the job panel, the theme toggle, the thread-roots toggle, window-tab scroll and click-to-reveal on sensitive media. It's local-only on purpose, and it never renders archived text as HTML.
+
+## Structure
+
+**TL;DR:** `src/lib/` is the engine the CLI and UI share, `src/pages/` is routes and API endpoints, `src/components/` holds components that each own their CSS, and `src/styles/` holds tokens and shared primitives.
+
+```
+src/
+  lib/            engine (archive, analyze, tone, refs, identity, http, cli) + UI helpers (archives, jobs, appview, format, ui)
+  middleware.ts   same-origin check for non-GET requests
+  layouts/        Base (html shell, masthead, theme toggle) · AccountLayout (header + tabs, 404 when not archived)
+  components/
+    ui/           Grid · Cell · Section · Stat · Tabs · Check · Ext · People · Chips · EmptyState
+    jobs/         JobRunner (the only real island) · ArchiveForm · ToneControls · AnalysisActions · NoReport · UpgradeReport
+    report/       HeadlineStats · ToneStat · ShapeSection · HoursChart · TargetingSection · ToneSection · InterestsSection
+    records/      CollectionList · Pager · RootsToggle · RecordCard · RefList · PostEmbed · EmbedMedia · MediaThumbs
+    account/      AccountHeader · AccountGrid
+  pages/          / · /accounts · /about · /a/[handle] · /a/[handle]/[snapshot]/{report,records/[...collection],identity}
+                  /blobs/[handle]/[file] · /api/jobs · /api/jobs/[id]/events · /api/jobs/[id]/confirm
+  styles/         global.css (tokens + primitives) · media.css (the one breakpoint)
+```
+
+- The CLI still runs with plain Node (`node src/lib/cli.ts`), with no Astro involved. `src/lib/*` keeps `.ts` import extensions and erasable-only TypeScript for that reason.
+- `@astrojs/check` pins TypeScript to 5–6, so the project uses TypeScript 6.
 
 ## Security
 
-**TL;DR:** binds to `127.0.0.1` only, rejects cross-origin non-GET requests, and keeps the API key server-side. The server writes to disk and can spend Claude credits, so nothing outside this machine may reach it.
+**TL;DR:** it binds to `127.0.0.1` (Astro `server.host`, plus `HOST` in `npm run serve`), middleware rejects cross-origin non-GET requests, path segments are allowlisted, and the API key stays server-side. The server writes to disk and can spend Claude credits, so nothing outside this machine may reach it.
 
 - **Bind address:** `127.0.0.1`, never `0.0.0.0`. Exposing it remotely needs real auth in front (see the parked Cloudflare Access plan in project memory), not a flag flip.
-- **Origin check:** any non-GET request with an `Origin` header that doesn't match `http://<Host>` gets a 403. This stops a malicious web page from POSTing jobs to the local server. Behind a tunnel this check must compare hosts instead.
-- **Paths:** handle, snapshot, collection and blob names must match `^[A-Za-z0-9._:-]+$` and resolve inside the archive root.
-- **API key:** read from `.env` by the server (`--env-file-if-exists`). The browser only ever sees `hasApiKey: true/false`.
+- **Origin check:** `src/middleware.ts` returns 403 for any non-GET request whose `Origin` host doesn't match the request host. This stops a malicious page from POSTing jobs here. It skips prerendered routes, which can't receive POSTs. Behind a tunnel this still holds, because it compares hosts rather than full origins.
+- **Paths:** handle, snapshot, collection and blob names must match `^[A-Za-z0-9._:-]+$` and resolve inside the archive root (`SAFE_NAME` in `src/lib/archives.ts`).
+- **API key:** `npm run dev` and `npm run serve` start Node with `--env-file-if-exists=.env`. Only server code reads the key, and the browser never sees it.
 
 ## Rendering untrusted text
 
-**TL;DR:** all DOM is built with `h()` in `web/app.js`, which inserts strings as text nodes and only allows `http(s)`, `#` and `/` URLs in `href`/`src`. Archived posts are attacker-controlled, so never use `innerHTML` with record content.
+**TL;DR:** archived posts are attacker-controlled. Astro escapes every `{expression}`, so render record content only through expressions and never with `set:html`. Links go through `Ext` / `safeHref`, which allow only `http(s)`, `/` and `#`.
 
-## API
+- The one client script that writes archive-derived text (`JobRunner`'s log and estimate) uses `textContent` only.
 
-**TL;DR:** a small JSON API plus SSE for jobs.
+## Jobs
+
+**TL;DR:** `JobRunner` wraps a form. On submit it POSTs `/api/jobs`, clones a server-rendered `<template>` for the panel, and streams progress over SSE. When the tone step posts an estimate, it shows Proceed/Skip and POSTs the answer to `/api/jobs/[id]/confirm`.
 
 | route | purpose |
 |---|---|
-| `GET /api/accounts` | accounts on disk, with snapshot summaries |
-| `GET /api/config` | default model, whether an API key is present |
-| `GET /api/snapshot/:handle/:snapshot` | manifest, Bluesky profile, analysis |
-| `GET /api/snapshot/:handle/:snapshot/identity` | DID document, PLC audit log |
-| `GET /api/snapshot/:handle/:snapshot/records/:collection?offset&limit&order` | paged records, `newest` or `oldest` |
-| `GET /blobs/:handle/:file` | downloaded media |
-| `POST /api/jobs` | start `archive` or `analyze`, optionally with tone |
-| `GET /api/jobs/:id/events` | SSE: replays the job's history, then streams |
+| `POST /api/jobs` | start `archive` or `analyze` (`{ mode, input, snapshot?, media?, analyze?, tone?, model?, toneLimit? }`) |
+| `GET /api/jobs/:id/events` | SSE. Each event carries an `id`, and a reconnect with `Last-Event-ID` resumes rather than replaying |
 | `POST /api/jobs/:id/confirm` | answer a tone estimate `{ yes }` |
+| `GET /blobs/:handle/:file` | downloaded media |
 
-- Jobs live in memory and are dropped an hour after they start.
-- "Newest first" reverses the JSONL file. See [archive-format.md](archive-format.md#record-order).
-- Static files are served `cache-control: no-cache`, so UI edits show up on a plain reload.
+- Jobs live in memory in the server process and are dropped an hour after they start.
+- Astro allows one dev server per project. To test against another archive root, build and run `dist/server/entry.mjs` with `SLURP_ARCHIVES` and `PORT` set.
 
 ## Embeds
 
-**TL;DR:** likes, reposts and reply parents (plus thread roots on request) show the target post, fetched from the public AppView in batches of 25.
+**TL;DR:** likes, reposts and reply parents (plus thread roots when the `slurp-roots` cookie is set) show the target post, fetched server-side from the public AppView in batches of 25 and cached for 10 minutes. `undefined` means the AppView couldn't be reached; `null` means it has no such post. Those render differently.
 
-- A post the AppView doesn't return is shown as "unavailable": deleted, taken down, or hidden from logged-out viewers. The pointer still records which post it was.
+- `null` renders as "Post unavailable": deleted, taken down, or hidden from logged-out viewers. The pointer still records which post it was.
+- `undefined` renders as "Couldn't load this post" with a link to bsky.app. A network failure must never be presented as a deletion.
+- Pointer labels resolve DIDs to `@handles` server-side too (`getHandles`, same cache).
 - Images on posts or authors labelled `porn`, `sexual`, `nudity`, `graphic-media` or `gore` are blurred until clicked.
 - Media not on disk loads from the account's PDS (the user's choice).
 
 ## Design
 
-**TL;DR:** brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, Titillium Web, uppercase headings, no radius or shadow, light and dark themes.
+**TL;DR:** a brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, Titillium Web, uppercase headings, no radius or shadow, light and dark themes. Tokens are global, and every component owns its own CSS.
 
-- **Tokens:** every length, size, type step, tracking and leading value is a custom property on `:root` in `web/style.css`. Rules use `var(--…)` or a `calc()` of tokens. The only raw lengths outside `:root` are the `860px` breakpoint (media queries can't read custom properties) and the phone-size token overrides inside it. Inline `style` in `app.js` is reserved for data-driven widths and heights (chart bars).
+- **Tokens:** every length, size, type step, tracking and leading value is a custom property on `:root` in `src/styles/global.css`. Rules use `var(--…)` or a `calc()` of tokens. Inline `style` is reserved for data-driven widths and heights (chart bars).
+- **One breakpoint:** `@custom-media --narrow` in `src/styles/media.css`, injected into every stylesheet by `@csstools/postcss-global-data` + `postcss-custom-media` (see `postcss.config.mjs`). Components write `@media (--narrow)`, and `860px` appears exactly once.
 - **Scales:** spacing `--space-3xs` to `--space-xl` (2px to 32px), type `--text-2xs` to `--text-lg` plus four fluid display sizes, tracking `--track` / `--track-wide`, and `--control` (2.75rem) as the minimum tap target.
-- **One line, never two:** hairlines come from `gap: var(--line)` over an ink background. A grid nested inside a cell drops its own bottom border (`.cell .grid`), since the outer grid already draws that edge. Nested content that needs lines should be full-bleed cells in the same grid, not a grid floating inside padding. A 2-column grid with an odd number of cells stretches the last one across the row, so the ink background never shows through as a black block.
+- **Scoped styles:** a component's `<style>` is scoped to its own template. `Grid` and `Cell` spread their props onto their root element, so a parent's scope attribute reaches them and `class` passed from a parent stays styleable. Use `:global()` only for classes applied through `Ext` (`blurred`, `link-card-link`).
+- **One line, never two:** a grid nested inside a cell drops its own bottom border (`.cell .grid`), since the outer grid already draws that edge. Nested content that needs lines should be full-bleed cells in the same grid, not a grid floating inside padding. A 2-column grid with an odd number of cells stretches the last one across the row, so the ink background never shows through as a black block.
 - **Wordmark overflow:** the letter-spaced wordmark trails spacing after its last glyph. Without `overflow: hidden` it widened the page on phones and caused horizontal scroll (found in testing).
 - **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference. `body` has bottom padding so the last row can always scroll clear of it, after it was found covering the Proceed button.
-- **Theme before paint:** an inline script in `index.html` applies the saved theme before first paint so night mode doesn't flash white.
-- **Scroll:** switching time windows keeps your scroll position. Any other navigation starts at the top.
+- **Theme before paint:** an inline script in `Base.astro` applies the saved theme before first paint so night mode doesn't flash white.
+- **Scroll:** time-window tabs are full page loads, and `Tabs` with `keepScroll` restores the scroll position after the switch. Any other navigation starts at the top.

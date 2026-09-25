@@ -1,0 +1,58 @@
+---
+import type { PostView } from '../../lib/appview.ts';
+import { fmt, when } from '../../lib/format.ts';
+import { bskyPostUrl, SENSITIVE } from '../../lib/ui.ts';
+import Ext from '../ui/Ext.astro';
+import EmbedMedia from './EmbedMedia.astro';
+
+interface Props {
+  kicker: string;
+  uri: string;
+  post: PostView | null | undefined;
+}
+
+const { kicker, uri, post: p } = Astro.props;
+const labels: string[] = p ? [...(p.labels ?? []), ...(p.author.labels ?? [])].map((l: any) => l.val).filter((v: string) => !v.startsWith('!')) : [];
+const sensitive = labels.some((l) => SENSITIVE.has(l));
+---
+
+<div class="slot">
+  <p class="kicker">{kicker}</p>
+  {
+    p === undefined ? (
+      <div class="embed gone">
+        <p><strong>Couldn’t load this post. </strong>The Bluesky AppView didn’t answer. <Ext href={bskyPostUrl(uri)}>Open it on bsky.app ↗</Ext></p>
+      </div>
+    ) : p === null ? (
+      <div class="embed gone">
+        <p><strong>Post unavailable. </strong>Deleted, taken down, or hidden from logged-out viewers. The pointer above still records which post it was.</p>
+      </div>
+    ) : (
+      <article class="embed">
+        {p.author.avatar ? <img class="avatar sm" src={p.author.avatar} alt="" loading="lazy" /> : <div class="avatar sm" />}
+        <div>
+          <div class="head">
+            <span class="break">
+              {p.author.displayName && <strong>{p.author.displayName} </strong>}
+              <span class="muted">@{p.author.handle}</span>
+            </span>
+            <Ext href={bskyPostUrl(p.uri)}>{when(p.record?.createdAt)} ↗</Ext>
+          </div>
+          {p.record?.text && <p class="text">{p.record.text}</p>}
+          <EmbedMedia embed={p.embed} sensitive={sensitive} />
+          {labels.length > 0 && <p class="tag-row mt-xs">{labels.map((l) => <span class="tag">{l}</span>)}</p>}
+          <p class="stats muted">{fmt(p.replyCount)} replies · {fmt(p.repostCount)} reposts · {fmt(p.quoteCount)} quotes · {fmt(p.likeCount)} likes</p>
+        </div>
+      </article>
+    )
+  }
+</div>
+
+<style>
+  .slot { margin-top: var(--space-md); }
+  .embed { display: grid; grid-template-columns: var(--avatar-sm) minmax(0, 1fr); gap: var(--space-sm); margin-top: var(--space-2xs); padding: var(--space-md); border: var(--line) solid var(--ink); }
+  .embed.gone { display: block; border-style: dashed; font-size: var(--text-sm); }
+  .head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2xs) var(--space-sm); font-size: var(--text-sm); }
+  .text { margin-top: var(--space-xs); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .stats { font-size: var(--text-xs); margin-top: var(--space-xs); font-variant-numeric: tabular-nums; }
+</style>

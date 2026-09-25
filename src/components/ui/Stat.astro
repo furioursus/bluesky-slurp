@@ -1,0 +1,19 @@
+---
+import Cell from './Cell.astro';
+
+interface Props {
+  kicker: string;
+  value: string;
+  note?: string | null;
+  size?: 'number' | 'subtitle';
+}
+
+const { kicker, value, note, size = 'number' } = Astro.props;
+---
+
+<Cell stack="sm">
+  <p class="kicker">{kicker}</p>
+  <p class={size === 'number' ? 'big-number' : 'subtitle'}>{value}</p>
+  {note && <p class="muted">{note}</p>}
+  <slot />
+</Cell>

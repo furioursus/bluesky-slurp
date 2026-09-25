@@ -1,0 +1,12 @@
+---
+import { safeHref } from '../../lib/ui.ts';
+
+interface Props {
+  href: string;
+  class?: string;
+}
+
+const { href, class: className } = Astro.props;
+---
+
+<a href={safeHref(href)} target="_blank" rel="noopener noreferrer" class={className}><slot /></a>

@@ -1,0 +1,37 @@
+---
+import type { AccountSummary } from '../../lib/archives.ts';
+import { day, plural } from '../../lib/format.ts';
+import Grid from '../ui/Grid.astro';
+
+interface Props {
+  accounts: AccountSummary[];
+}
+
+const { accounts } = Astro.props;
+---
+
+<Grid cols="2">
+  {
+    accounts.map((a) => {
+      const s = a.snapshots[0];
+      return (
+        <a class="cell card" href={`/a/${a.handle}/${s.snapshot}/report`}>
+          {a.avatar ? <img class="avatar" src={a.avatar} alt="" loading="lazy" /> : <div class="avatar" />}
+          <div>
+            <div class="break handle">@{a.handle}</div>
+            {a.displayName && <div class="break">{a.displayName}</div>}
+            <div class="muted text-xs">{plural(s.totalRecords, 'record')} · {plural(a.snapshots.length, 'snapshot')} · {day(s.fetchedAt)}</div>
+          </div>
+        </a>
+      );
+    })
+  }
+</Grid>
+
+<style>
+  .card { display: grid; grid-template-columns: var(--avatar) minmax(0, 1fr); gap: var(--space-md); align-items: center; text-decoration: none; }
+  .card:hover { background: var(--ink); color: var(--paper); }
+  .card:hover .muted { color: var(--paper); }
+  .card:hover .avatar { filter: none; }
+  .handle { font-size: var(--text-lg); line-height: var(--leading-snug); }
+</style>

@@ -1,0 +1,28 @@
+---
+import { fmt } from '../../lib/format.ts';
+
+interface Props {
+  href: (offset: number, order?: 'newest' | 'oldest') => string;
+  offset: number;
+  limit: number;
+  total: number;
+  order: 'newest' | 'oldest';
+}
+
+const { href, offset, limit, total, order } = Astro.props;
+const first = offset === 0;
+const last = offset + limit >= total;
+---
+
+<div class="pager">
+  <a class:list={['btn', { invisible: first }]} href={href(Math.max(0, offset - limit))} aria-disabled={first ? 'true' : undefined}>← Prev</a>
+  <span class="muted">
+    {fmt(total ? offset + 1 : 0)}–{fmt(Math.min(offset + limit, total))} of {fmt(total)} ·
+    <a href={href(0, order === 'newest' ? 'oldest' : 'newest')}>{order === 'newest' ? 'newest first' : 'oldest first'}</a>
+  </span>
+  <a class:list={['btn', { invisible: last }]} href={href(offset + limit)} aria-disabled={last ? 'true' : undefined}>Next →</a>
+</div>
+
+<style>
+  .pager { display: flex; justify-content: space-between; align-items: center; gap: var(--space-sm); }
+</style>
