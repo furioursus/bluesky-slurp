@@ -13,26 +13,41 @@ const links = [
 ] as const;
 ---
 
-<Grid as="header" class="masthead">
-  <a class="cell wordmark" href="/" aria-label="Slurp home">SLURP</a>
-  <nav class="cell nav" aria-label="Main">
-    {links.map((l) => <a href={l.href} aria-current={l.key === current ? 'page' : undefined}>{l.label}</a>)}
-  </nav>
-  <div class="cell tagline"><p>Everything an account has put on the atmosphere, on your disk.</p></div>
-</Grid>
+<header class="masthead">
+  <Grid as="div" class="bar">
+    <a class="cell wordmark" href="/" aria-label="Slurp home"><span aria-hidden="true">SLURP</span></a>
+    <nav class="cell nav" aria-label="Main">
+      {links.map((l) => <a href={l.href} aria-current={l.key === current ? 'page' : undefined}>{l.label}</a>)}
+    </nav>
+    <div class="cell tagline"><p>Everything an account has put on the atmosphere, on your disk.</p></div>
+  </Grid>
+</header>
 
 <style>
-  .masthead { grid-template-columns: minmax(0, 2fr) minmax(0, 0.8fr) minmax(0, 0.8fr); }
+  .masthead {
+    container: masthead / inline-size;
+    --wordmark-glyphs: 2.8611;
+    --wordmark-gaps: 4;
+    --wordmark-track: 0.55;
+  }
+  .bar { grid-template-columns: minmax(0, 2fr) minmax(0, 0.8fr) minmax(0, 0.8fr); }
+
+  /* see docs/web-ui.md#masthead */
   .wordmark {
+    container-type: inline-size;
     display: flex;
     align-items: center;
-    font-size: var(--text-wordmark);
-    letter-spacing: var(--track-wordmark);
-    line-height: 1;
     text-decoration: none;
     padding-block: var(--pad);
-    overflow: hidden; /* see docs/web-ui.md#design */
+    overflow: hidden;
   }
+  .wordmark span {
+    font-size: calc(100cqi / (var(--wordmark-glyphs) + var(--wordmark-gaps) * var(--wordmark-track)));
+    letter-spacing: calc(var(--wordmark-track) * 1em);
+    line-height: 1;
+    white-space: nowrap;
+  }
+
   .nav { display: grid; padding: 0; gap: var(--line); background: var(--ink); }
   .nav a {
     background: var(--paper);
@@ -48,8 +63,8 @@ const links = [
   .nav a:hover, .nav a[aria-current='page'] { background: var(--ink); color: var(--paper); }
   .tagline { display: flex; align-items: center; justify-content: center; text-align: center; text-transform: uppercase; font-size: var(--text-sm); letter-spacing: var(--track); }
 
-  @media (--narrow) {
-    .masthead { grid-template-columns: minmax(0, 1fr); }
+  @container masthead (width < 54rem) {
+    .bar { grid-template-columns: minmax(0, 1fr); }
     .nav { grid-auto-flow: column; }
     .nav a { justify-content: center; padding: 0 var(--space-xs); }
     .tagline { display: none; }

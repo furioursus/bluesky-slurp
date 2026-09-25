@@ -27,14 +27,12 @@
   --text-title: clamp(1.75rem, 3.6vw, 3.25rem);
   --text-number: clamp(2.25rem, 4.5vw, 3.75rem);
   --text-display: clamp(2.25rem, 5.2vw, 4.625rem);
-  --text-wordmark: clamp(3rem, 10.5vw, 8.5rem);
 
   --leading: 1.55;
   --leading-snug: 1.2;
   --leading-tight: 1.05;
   --track: 0.06em;
   --track-wide: 0.1em;
-  --track-wordmark: 0.55em;
 
   --control: 2.75rem;
   --box: 1.625rem;

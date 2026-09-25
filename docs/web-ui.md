@@ -69,11 +69,21 @@ src/
 **TL;DR:** a brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, Titillium Web, uppercase headings, no radius or shadow, light and dark themes. Tokens are global, and every component owns its own CSS.
 
 - **Tokens:** every length, size, type step, tracking and leading value is a custom property on `:root` in `src/styles/global.css`. Rules use `var(--…)` or a `calc()` of tokens. Inline `style` is reserved for data-driven widths and heights (chart bars).
-- **One breakpoint:** `@custom-media --narrow` in `src/styles/media.css`, injected into every stylesheet by `@csstools/postcss-global-data` + `postcss-custom-media` (see `postcss.config.mjs`). Components write `@media (--narrow)`, and `860px` appears exactly once.
+- **One page breakpoint:** `@custom-media --narrow` in `src/styles/media.css`, injected into every stylesheet by `@csstools/postcss-global-data` + `postcss-custom-media` (see `postcss.config.mjs`). Components write `@media (--narrow)`, and `860px` appears exactly once. The masthead is the exception: it responds to its own width with a container query (see [Masthead](#masthead)).
 - **Scales:** spacing `--space-3xs` to `--space-xl` (2px to 32px), type `--text-2xs` to `--text-lg` plus four fluid display sizes, tracking `--track` / `--track-wide`, and `--control` (2.75rem) as the minimum tap target.
 - **Scoped styles:** a component's `<style>` is scoped to its own template. `Grid` and `Cell` spread their props onto their root element, so a parent's scope attribute reaches them and `class` passed from a parent stays styleable. Use `:global()` only for classes applied through `Ext` (`blurred`, `link-card-link`).
 - **One line, never two:** a grid nested inside a cell drops its own bottom border (`.cell .grid`), since the outer grid already draws that edge. Nested content that needs lines should be full-bleed cells in the same grid, not a grid floating inside padding. A 2-column grid with an odd number of cells stretches the last one across the row, so the ink background never shows through as a black block.
-- **Wordmark overflow:** the letter-spaced wordmark trails spacing after its last glyph. Without `overflow: hidden` it widened the page on phones and caused horizontal scroll (found in testing).
 - **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference. `body` has bottom padding so the last row can always scroll clear of it, after it was found covering the Proceed button.
 - **Theme before paint:** an inline script in `Base.astro` applies the saved theme before first paint so night mode doesn't flash white.
 - **Scroll:** time-window tabs are full page loads, and `Tabs` with `keepScroll` restores the scroll position after the switch. Any other navigation starts at the top.
+- **Stale styles in dev:** after editing a component's `<style>`, Astro's dev server has been seen serving the old CSS on full page loads while the file watcher reports the change. If a style edit seems to do nothing, restart `npm run dev` before debugging the CSS.
+
+## Masthead
+
+**TL;DR:** the masthead sizes itself from container queries, not the viewport. The `<header>` is a `masthead` container, so the grid inside collapses when the masthead itself is under `54rem`. The wordmark cell is its own `inline-size` container, and "SLURP" is set in `cqi` so its visible ink fills the cell's content width exactly, at any layout.
+
+- **Why a wrapper:** a container query can't style the container itself, only its descendants. `<header class="masthead">` is the container, and the grid (`.bar`) inside it is what changes columns.
+- **Wordmark fill:** `font-size = 100cqi / (glyphs + gaps × tracking)`. Measured in Titillium Web 400, "SLURP" is `2.8611em` of glyphs with 4 gaps of `0.55em` tracking between letters, so the visible text is `5.0611em` wide. The 5th tracking gap trails after the last letter as empty space and is clipped by `overflow: hidden`, which also keeps the page from scrolling sideways.
+- **Changing the text or font:** re-measure the glyph width (render the word at `100px` with `letter-spacing: 0` and divide its width by 100) and update `--wordmark-glyphs`. Update `--wordmark-gaps` if the letter count changes.
+- **The one literal:** `@container masthead (width < 54rem)`. Container conditions can't read custom properties, and `postcss-custom-media` only handles `@media`. The threshold is the masthead's own need (three columns stop fitting), not the page breakpoint, so it lives only in `Masthead.astro`.
+- **Measured fill:** the ink width equals the cell's content width at 375, 567, 860, 870, 1280 and 1920px, with no horizontal overflow at any of them.
