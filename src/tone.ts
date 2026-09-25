@@ -11,7 +11,7 @@ import { createInterface } from 'node:readline/promises';
 import Anthropic from '@anthropic-ai/sdk';
 import { getJson, pool, xrpc } from './http.ts';
 
-export const DEFAULT_MODEL = 'claude-opus-5';
+export const DEFAULT_MODEL = 'claude-sonnet-5';
 const BATCH = 20;
 const CONCURRENCY = 3;
 

@@ -81,9 +81,9 @@ Caveats:
 **TL;DR:** `--tone` sends up to 200 replies/quotes to Claude (75% the most recent cold ones, 25% warm as a baseline), each with the post it answered, and adds a cold-vs-warm label table with example links to the report. It counts the tokens exactly first, shows the dollar range, and asks before spending anything.
 
 - **Auth:** `ANTHROPIC_API_KEY`, or an `ant auth login` profile.
-- **Model:** `claude-opus-5` by default. Override with `--model` (priced: `claude-sonnet-5`, `claude-haiku-4-5`, `claude-opus-5-5`, `claude-fable-5-1`, `claude-opus-4-8`). Runs at `effort: low` with JSON-schema output, 20 posts per request, 3 requests at a time.
+- **Model:** `claude-sonnet-5` by default (about $0.20–$0.55 for a full 200-post pass). Override with `--model` (priced: `claude-opus-5`, `claude-haiku-4-5`, `claude-opus-5-5`, `claude-fable-5-1`, `claude-opus-4-8`). Runs at `effort: low` with JSON-schema output, 20 posts per request, 3 requests at a time.
 - **Estimate:** input tokens come from `count_tokens` (exact and free). Output is a range, because thinking length varies. After the run it prints the actual tokens and cost.
 - **Flags:** `--tone-limit <n>` (default 200), `-y/--yes` to skip the prompt. With no terminal and no `--yes`, it skips the paid part and says so.
 - **Labels:** genuine, supportive, playful, disagreeing, argumentative, hostile, trolling, unclear. The TL;DR compares the bad-faith share (argumentative + hostile + trolling) on cold vs warm posts. A big gap is the tell. A high number on both is just how they talk.
 - **Caching:** labels are stored per post in the snapshot's `tone.json`. Re-runs and larger limits only pay for unlabelled posts. Changing `--model` re-labels.
-- **Refusals:** on Opus 5 and Fable 5.1, `fallbacks: "default"` re-runs a declined request on a fallback model server-side. Anything still without a label is marked `refused`.
+- **Refusals:** with `--model claude-opus-5` or `claude-fable-5-1`, `fallbacks: "default"` re-runs a declined request on a fallback model server-side. The Sonnet 5 default has no server-side fallback. Anything still without a label is marked `refused`.
