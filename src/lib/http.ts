@@ -1,4 +1,4 @@
-const UA = 'bluesky-profile-slurper/0.1 (+archival)';
+const UA = 'bluesky-slurp/0.1 (+https://github.com/furioursus/bluesky-slurp)';
 
 export class HttpError extends Error {
   status: number;

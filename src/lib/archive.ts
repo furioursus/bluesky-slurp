@@ -103,7 +103,7 @@ export async function archiveAccount(input: string, opts: ArchiveOptions, log: (
     selfLabels.has('!no-unauthenticated') || profile?.labels?.some((l: any) => l.val === '!no-unauthenticated') === true;
 
   const manifest = {
-    tool: 'bluesky-profile-slurper',
+    tool: 'bluesky-slurp',
     fetchedAt,
     input,
     did: id.did,

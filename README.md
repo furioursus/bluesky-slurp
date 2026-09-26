@@ -1,4 +1,4 @@
-# bluesky-profile-slurper
+# Slurp
 
 [![Node ≥ 23.6](https://img.shields.io/badge/node-%E2%89%A5%2023.6-000?style=flat-square&logo=nodedotjs)](package.json) [![Astro](https://img.shields.io/github/package-json/dependency-version/furioursus/bluesky-slurp/astro?style=flat-square&color=000&logo=astro)](https://astro.build) [![atproto](https://img.shields.io/badge/atproto-archiver-000?style=flat-square&logo=bluesky)](https://atproto.com) [![MIT license](https://img.shields.io/badge/license-MIT-000?style=flat-square)](LICENSE)
 
