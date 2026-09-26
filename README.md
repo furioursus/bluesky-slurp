@@ -6,7 +6,7 @@
 
 ## Docs
 
-**TL;DR:** the "why" behind the code lives here. Code has no comments except one-line links into these files for traps and security choices.
+The "why" behind the code lives here. Code has no comments except one-line links into these files for traps and security choices.
 
 | doc | covers |
 |---|---|
@@ -16,7 +16,7 @@
 
 ## Usage
 
-**TL;DR:** Node ≥ 23.6, `npm install`. The CLI runs directly with no build (`npm run slurp -- <args>`). The web UI is Astro: `npm run dev`. Video poster frames in the media wall need `ffmpeg` on `PATH` (`brew install ffmpeg`); without it, video tiles show just a ▶ badge.
+Node ≥ 23.6, `npm install`. The CLI runs directly with no build (`npm run slurp -- <args>`). The web UI is Astro: `npm run dev`. Video poster frames in the media wall need `ffmpeg` on `PATH` (`brew install ffmpeg`); without it, video tiles show just a ▶ badge.
 
 ```sh
 npm install
@@ -31,7 +31,7 @@ Input can be a handle, `@handle`, a DID (`did:plc:…` / `did:web:…`), an `at:
 
 ## Web UI
 
-**TL;DR:** `npm run dev` → http://127.0.0.1:4747. It's an Astro 7 app rendered on the server over the same engine as the CLI: archive an account, read the report, browse every record with its pointers, and browse downloaded media. Details in [docs/web-ui.md](docs/web-ui.md).
+`npm run dev` → http://127.0.0.1:4747. It's an Astro 7 app rendered on the server over the same engine as the CLI: archive an account, read the report, browse every record with its pointers, and browse downloaded media. Details in [docs/web-ui.md](docs/web-ui.md).
 
 | command | what it does |
 |---|---|
@@ -46,7 +46,7 @@ Input can be a handle, `@handle`, a DID (`did:plc:…` / `did:web:…`), an `at:
 
 ### Component inspector (astro-pathfinder)
 
-**TL;DR:** `npm run dev:inspect`, then hover anything. A panel in the bottom-left names the `.astro` files that produced it, innermost first, each with a line number and clickable.
+`npm run dev:inspect`, then hover anything. A panel in the bottom-left names the `.astro` files that produced it, innermost first, each with a line number and clickable.
 
 ```
 src/components/records/PostEmbed.astro:44
@@ -64,7 +64,7 @@ src/pages/a/[handle]/[snapshot]/records/[...collection].astro:35
 
 ## What gets archived
 
-**TL;DR:** the whole signed repo from the account's own PDS, decoded to JSONL per collection, plus identity and the Bluesky AppView profile.
+The whole signed repo from the account's own PDS, decoded to JSONL per collection, plus identity and the Bluesky AppView profile.
 
 ```
 archives/<handle>/
@@ -85,7 +85,7 @@ archives/<handle>/
 
 ## Pointers (`refs`)
 
-**TL;DR:** each JSONL line has `uri` + `web` for the record itself and a `refs` array for everything it points at.
+Each JSONL line has `uri` + `web` for the record itself and a `refs` array for everything it points at.
 
 ```json
 {"uri":"at://did:plc:…/app.bsky.feed.like/3juq…","web":"https://pdsls.dev/at://…","refs":[
@@ -108,7 +108,7 @@ archives/<handle>/
 
 ## Analysis
 
-**TL;DR:** structural signals of good- or bad-faith engagement, plus interests. Offline except one batched handle lookup. Read the linked posts before concluding anything.
+Structural signals of good- or bad-faith engagement, plus interests. Offline except one batched handle lookup. Read the linked posts before concluding anything.
 
 - **Time windows:** every stat is computed for the last 30 days, 3 months, 6 months, 1 year, and all time, counted back from the snapshot date. The web UI switches between them instantly. `analysis.md` shows all time plus an "Over time" comparison table.
 - **Shape:** original vs self-thread vs reply vs quote, likes per post, cadence.

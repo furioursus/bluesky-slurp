@@ -4,7 +4,7 @@
 
 ## Structure
 
-**TL;DR:** `src/lib/` is the engine the CLI and UI share, `src/pages/` is routes and API endpoints, `src/components/` holds components that each own their CSS, and `src/styles/` holds tokens and shared primitives.
+`src/lib/` is the engine the CLI and UI share, `src/pages/` is routes and API endpoints, `src/components/` holds components that each own their CSS, and `src/styles/` holds tokens and shared primitives.
 
 ```
 src/
@@ -28,7 +28,7 @@ src/
 
 ## Security
 
-**TL;DR:** it binds to `127.0.0.1` (Astro `server.host`, plus `HOST` in `npm run serve`), middleware rejects cross-origin non-GET requests, path segments are allowlisted. The server writes to disk and runs jobs, so nothing outside this machine may reach it.
+It binds to `127.0.0.1` (Astro `server.host`, plus `HOST` in `npm run serve`), middleware rejects cross-origin non-GET requests, path segments are allowlisted. The server writes to disk and runs jobs, so nothing outside this machine may reach it.
 
 - **Bind address:** `127.0.0.1`, never `0.0.0.0`. Exposing it remotely needs real auth in front (see the parked Cloudflare Access plan in project memory), not a flag flip.
 - **Origin check:** `src/middleware.ts` returns 403 for any non-GET request whose `Origin` host doesn't match the request host. This stops a malicious page from POSTing jobs here. It skips prerendered routes, which can't receive POSTs. Behind a tunnel this still holds, because it compares hosts rather than full origins.
@@ -36,13 +36,13 @@ src/
 
 ## Rendering untrusted text
 
-**TL;DR:** archived posts are attacker-controlled. Astro escapes every `{expression}`, so render record content only through expressions and never with `set:html`. Links go through `Ext` / `safeHref`, which allow only `http(s)`, `/` and `#`.
+Archived posts are attacker-controlled. Astro escapes every `{expression}`, so render record content only through expressions and never with `set:html`. Links go through `Ext` / `safeHref`, which allow only `http(s)`, `/` and `#`.
 
 - The one client script that writes archive-derived text (`JobRunner`'s log) uses `textContent` only.
 
 ## Jobs
 
-**TL;DR:** `JobRunner` wraps a form. On submit it POSTs `/api/jobs`, clones a server-rendered `<template>` for the panel, and streams progress over SSE.
+`JobRunner` wraps a form. On submit it POSTs `/api/jobs`, clones a server-rendered `<template>` for the panel, and streams progress over SSE.
 
 | route | purpose |
 |---|---|
@@ -57,7 +57,7 @@ src/
 
 ## Embeds
 
-**TL;DR:** likes, reposts and reply parents (plus thread roots when the `slurp-roots` cookie is set) show the target post, fetched server-side from the public AppView in batches of 25 and cached for 10 minutes. `undefined` means the AppView couldn't be reached; `null` means it has no such post. Those render differently.
+Likes, reposts and reply parents (plus thread roots when the `slurp-roots` cookie is set) show the target post, fetched server-side from the public AppView in batches of 25 and cached for 10 minutes. `undefined` means the AppView couldn't be reached; `null` means it has no such post. Those render differently.
 
 - `null` renders as "Post unavailable": deleted, taken down, or hidden from logged-out viewers. The pointer still records which post it was.
 - `undefined` renders as "Couldn't load this post" with a link to bsky.app. A network failure must never be presented as a deletion.
@@ -67,7 +67,7 @@ src/
 
 ## Fonts
 
-**TL;DR:** no web fonts. Text uses a [Modern Font Stacks](https://github.com/system-fonts/modern-font-stacks) stack, Neo-Grotesque by default (Inter, Roboto, Helvetica Neue, Arial…). The **font** control next to day/night and blur switches the whole page between all 15 stacks, remembered per browser. Code and IDs always use the Monospace Code stack (`--mono`).
+No web fonts. Text uses a [Modern Font Stacks](https://github.com/system-fonts/modern-font-stacks) stack, Neo-Grotesque by default (Inter, Roboto, Helvetica Neue, Arial…). The **font** control next to day/night and blur switches the whole page between all 15 stacks, remembered per browser. Code and IDs always use the Monospace Code stack (`--mono`).
 
 - **Catalogue:** `FONT_STACKS` in `src/lib/fonts.ts`, copied verbatim from the Modern Font Stacks README. The first entry is the default. The Neo-Grotesque stack is also the `--font` default in `global.css`, for pages rendered with JavaScript off. Keep the two identical.
 - **What you get depends on the device:** each stack names system fonts and falls back through them, so Industrial is Bahnschrift on Windows but DIN Alternate on macOS. DIN Alternate only ships in bold, so on a Mac that stack renders every weight bold. Several stacks lack the 300 weight the headings and inputs use, and the browser picks the nearest.
@@ -79,7 +79,7 @@ src/
 
 ## Handle autocomplete
 
-**TL;DR:** the handle box on the home page suggests up to 8 accounts as you type: up to 3 already-archived accounts first (tagged "archived"), then Bluesky's public typeahead. Pick with the mouse or ↑/↓ + Enter. Picking fills the box and doesn't submit.
+The handle box on the home page suggests up to 8 accounts as you type: up to 3 already-archived accounts first (tagged "archived"), then Bluesky's public typeahead. Pick with the mouse or ↑/↓ + Enter. Picking fills the box and doesn't submit.
 
 - **Route:** `GET /api/typeahead?q=` (`src/pages/api/typeahead.ts`). Local matches come from `listAccounts` (handle or display name contains the query, prefix matches first). Remote matches come from `app.bsky.actor.searchActorsTypeahead` on the public AppView via `searchActors` in `src/lib/appview.ts`, 5 s timeout, cached per query for 10 minutes. Duplicates are dropped by DID. `offline: true` means the AppView couldn't be reached and only local matches came back.
 - **What leaves the machine:** the typed text, debounced 150 ms, goes from this server to `public.api.bsky.app`. The browser only talks to this server, but avatars load from Bluesky's CDN, the same as embeds do.
@@ -90,7 +90,7 @@ src/
 
 ## Design
 
-**TL;DR:** a brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, system font stacks (see [Fonts](#fonts)), uppercase headings, no radius or shadow, light and dark themes. Media and avatars show in full colour (the reference's grayscale-until-hover was dropped on 2026-09-25); only the sensitive-media blur stays grey. Tokens are global, and every component owns its own CSS.
+A brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, system font stacks (see [Fonts](#fonts)), uppercase headings, no radius or shadow, light and dark themes. Media and avatars show in full colour (the reference's grayscale-until-hover was dropped on 2026-09-25); only the sensitive-media blur stays grey. Tokens are global, and every component owns its own CSS.
 
 - **Tokens:** every length, size, type step, tracking and leading value is a custom property on `:root` in `src/styles/global.css`. Rules use `var(--…)` or a `calc()` of tokens. Inline `style` is reserved for data-driven values: chart bar widths and heights, and the font picker's per-option sample and the `--font` / `--wordmark-glyphs` it sets on `<html>`.
 - **One page breakpoint:** `@custom-media --narrow` in `src/styles/media.css` (which also holds `--hover-motion`, see [Hover previews](#hover-previews)), injected into every stylesheet by `@csstools/postcss-global-data` + `postcss-custom-media` (see `postcss.config.mjs`). Components write `@media (--narrow)`, and `860px` appears exactly once. The masthead is the exception: it responds to its own width with a container query (see [Masthead](#masthead)).
@@ -104,7 +104,7 @@ src/
 
 ## Media
 
-**TL;DR:** the Media tab (`/a/<handle>/<snapshot>/media`) is a wall of every downloaded file, filterable by type and source collection, 15 · 30 · 60 · 120 · 240 · 480 per page (default 60, remembered). Each file has a detail page with a viewer, alt text, size, download, and every record that uses it. Snapshots archived without media get a "Download media" job instead of an empty wall.
+The Media tab (`/a/<handle>/<snapshot>/media`) is a wall of every downloaded file, filterable by type and source collection, 15 · 30 · 60 · 120 · 240 · 480 per page (default 60, remembered). Each file has a detail page with a viewer, alt text, size, download, and every record that uses it. Snapshots archived without media get a "Download media" job instead of an empty wall.
 
 - **Index:** `src/lib/media.ts` scans the snapshot's records once for blob refs and caches the result as `media-index.json` in the snapshot (about 200ms to build, around 10ms from cache). Each entry has the CID, MIME type, file name, latest use, and every use: the record, role (JSON path), alt text, text and self-labels. See [archive-format.md](archive-format.md#media).
 - **What's "downloaded":** whatever is in `archives/<handle>/blobs/` right now, checked per request. The Records tab uses the same check, so media downloaded after the archive (via the job or `slurp media`) shows locally there too. The `local` field on refs only reflects `--media` at archive time and isn't used for display.
@@ -119,7 +119,7 @@ src/
 
 ## Thumbnails
 
-**TL;DR:** tiles load a 640px WebP from `/thumbs/<handle>/<file>` (about 40 KB) instead of the original (median 574 KB, up to 8 MB). Videos get a still poster frame instead of a `<video>` element. On one large archive this took a 60-tile page from 77 MB and 15–30 s of blank tiles to 2.4 MB, fully drawn in 1.6 s from cold.
+Tiles load a 640px WebP from `/thumbs/<handle>/<file>` (about 40 KB) instead of the original (median 574 KB, up to 8 MB). Videos get a still poster frame instead of a `<video>` element. On one large archive this took a 60-tile page from 77 MB and 15–30 s of blank tiles to 2.4 MB, fully drawn in 1.6 s from cold.
 
 - **Why videos matter most:** a `<video preload="metadata">` tile holds its HTTP/1.1 connection open for 15–30 s. The browser allows 6 connections per host, so a page with 6+ video tiles made every image behind them wait in the queue and show blank. Measured: 11 video tiles, every image request queued for 15.2 s, server time 2 ms.
 - **What gets made:** `src/lib/thumbs.ts`. JPEG, PNG, WebP and AVIF go through `sharp` (auto-rotated from EXIF, shortest side 640px, never enlarged). MP4, MOV and WebM have the frame at 0.1 s pulled by `ffmpeg`, then the same resize.
@@ -131,7 +131,7 @@ src/
 
 ## Hover previews
 
-**TL;DR:** on the media wall, hovering a tile zooms its thumbnail to 115% (`--zoom`, over `--zoom-time`), and hovering a video tile plays the video muted, looped and zoomed over its poster. Moving away stops it and frees the connection. Mouse and keyboard focus only.
+On the media wall, hovering a tile zooms its thumbnail to 115% (`--zoom`, over `--zoom-time`), and hovering a video tile plays the video muted, looped and zoomed over its poster. Moving away stops it and frees the connection. Mouse and keyboard focus only.
 
 - **Only when it makes sense:** everything is gated on `(hover: hover) and (prefers-reduced-motion: no-preference)`: `--hover-motion` in `src/styles/media.css` for the CSS, and the same string as `HOVER_MOTION` in `MediaWall`'s script. Keep the two in step. Touch taps never start a preview, and reduced-motion users get neither zoom nor playback.
 - **Built on hover, never in the markup:** a `<video>` in every tile is what made the wall blank (see [Thumbnails](#thumbnails)). The preview `<video class="preview">` is created on `pointerover` or `:focus-visible` from the tile's `data-preview` URL and destroyed on leave with `pause()`, `removeAttribute('src')`, `load()`, so the browser drops the connection. Checked: after hovering 10 video tiles in a row, 0 previews were left over and 12 thumbnails fetched in 59 ms.
@@ -143,7 +143,7 @@ src/
 
 ## Sensitive media
 
-**TL;DR:** media whose records self-label `porn`, `sexual`, `nudity`, `graphic-media` or `gore` renders with the `blurred` class. The **blur** toggle next to day/night turns the blur off everywhere. It's remembered per browser, and it's on by default.
+Media whose records self-label `porn`, `sexual`, `nudity`, `graphic-media` or `gore` renders with the `blurred` class. The **blur** toggle next to day/night turns the blur off everywhere. It's remembered per browser, and it's on by default.
 
 - **Where it applies:** the media wall, the media viewer, and embed images in Records (`MediaWall`, `MediaViewer`, `EmbedMedia`, `PostEmbed`).
 - **Click to reveal:** with blur on, clicking a blurred item removes its blur instead of following the link (`SensitiveReveal`). With blur off, clicks go straight through.
@@ -153,7 +153,7 @@ src/
 
 ## Source links
 
-**TL;DR:** wherever a record is shown (Records tab, media "Used in"), it links back to where it lives: first any URL the record itself carries, then the app's own page from a pattern registry (`src/lib/sources.ts`), then always the raw record on pdsls.dev. Each link says how it was established: stored in the record, verified against a real page, or estimated (`≈`).
+Wherever a record is shown (Records tab, media "Used in"), it links back to where it lives: first any URL the record itself carries, then the app's own page from a pattern registry (`src/lib/sources.ts`), then always the raw record on pdsls.dev. Each link says how it was established: stored in the record, verified against a real page, or estimated (`≈`).
 
 | kind | shown as | meaning |
 |---|---|---|
@@ -184,7 +184,7 @@ src/
 
 ## Scroll
 
-**TL;DR:** `ClientRouter` scrolls to the top after every page swap. Links inside a `data-keep-scroll` container (the collections list and the time-window tabs) keep your place instead. `src/lib/scroll.ts` captures the page's scroll plus every `data-scroll-id` pane's inner scroll when you click such a link, then restores it in `astro:after-swap`, before the browser paints.
+`ClientRouter` scrolls to the top after every page swap. Links inside a `data-keep-scroll` container (the collections list and the time-window tabs) keep your place instead. `src/lib/scroll.ts` captures the page's scroll plus every `data-scroll-id` pane's inner scroll when you click such a link, then restores it in `astro:after-swap`, before the browser paints.
 
 - **Why `after-swap`:** the router swaps the DOM, scrolls to the top, and dispatches `astro:after-swap` in one synchronous step (`moveToLocation` then `triggerEvent` in `astro/dist/transitions/router.js`). Restoring there means the top-of-page frame never paints. A restore after load, as the earlier sessionStorage version did, always showed one frame at the top: that was the jump.
 - **Not persisted on purpose:** the collections list isn't `transition:persist`, because a persisted element keeps its old `aria-current` highlight. Its inner scroll is carried across the swap instead.
@@ -197,7 +197,7 @@ src/
 
 ## Masthead
 
-**TL;DR:** the masthead sizes itself from container queries, not the viewport. The `<header>` is a `masthead` container, so the grid inside collapses when the masthead itself is under `54rem`. The wordmark cell is its own `inline-size` container, and "SLURP" is set in `cqi` so its visible ink fills the cell's content width exactly, at any layout.
+The masthead sizes itself from container queries, not the viewport. The `<header>` is a `masthead` container, so the grid inside collapses when the masthead itself is under `54rem`. The wordmark cell is its own `inline-size` container, and "SLURP" is set in `cqi` so its visible ink fills the cell's content width exactly, at any layout.
 
 - **Why a wrapper:** a container query can't style the container itself, only its descendants. `<header class="masthead">` is the container, and the grid (`.bar`) inside it is what changes columns.
 - **Wordmark fill:** `font-size = 100cqi / (glyphs + gaps × tracking)`. `--wordmark-glyphs` is measured at runtime for whichever font is active (see [Fonts](#fonts)): about `3.259em` in Helvetica Neue, which is also the CSS fallback. The 4 gaps between letters are `0.55em` of tracking each. The 5th tracking gap trails after the last letter as empty space and is clipped by `overflow: hidden`, which also keeps the page from scrolling sideways.

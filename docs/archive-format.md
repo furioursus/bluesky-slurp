@@ -1,10 +1,10 @@
 # Archive format
 
-**TL;DR:** one directory per account, one timestamped snapshot per run. Each snapshot holds the raw signed repo (`repo.car`) plus every record decoded to JSONL, with a `refs` array of pointers per record. Media is shared across snapshots under `blobs/`. Code: `src/lib/archive.ts`, `src/lib/refs.ts`.
+One directory per account, one timestamped snapshot per run. Each snapshot holds the raw signed repo (`repo.car`) plus every record decoded to JSONL, with a `refs` array of pointers per record. Media is shared across snapshots under `blobs/`. Code: `src/lib/archive.ts`, `src/lib/refs.ts`.
 
 ## Layout
 
-**TL;DR:** `archives/<handle>/snapshots/<UTC timestamp>/`, plus `archives/<handle>/blobs/` when media is downloaded and `thumbs/` once the web UI has shown it.
+Each run writes `archives/<handle>/snapshots/<UTC timestamp>/`. Next to the snapshots sit `blobs/` once media is downloaded and `thumbs/` once the web UI has shown it.
 
 ```
 archives/<handle>/
@@ -27,7 +27,7 @@ archives/<handle>/
 
 ## Media
 
-**TL;DR:** downloaded files live once per account in `blobs/<cid>.<ext>` and are shared by every snapshot. `media-index.json` in a snapshot lists every file that snapshot references and the records that use it.
+Downloaded files live once per account in `blobs/<cid>.<ext>` and are shared by every snapshot. `media-index.json` in a snapshot lists every file that snapshot references and the records that use it.
 
 - Files are written as `<cid>.part`, then renamed, so an interrupted download never leaves a truncated file under its real name.
 - The extension comes from the MIME type (`jpg`, `png`, `webp`, `gif`, `heic`, `avif`, `mp4`, `mov`, `webm`, `mp3`, `pdf`), otherwise `bin`.
@@ -36,14 +36,14 @@ archives/<handle>/
 
 ## Record JSON
 
-**TL;DR:** records are decoded from DAG-CBOR and round-tripped through `JSON.stringify` so CIDs become `{"$link": …}` and bytes become `{"$bytes": …}`, which is atproto's standard JSON form.
+Records are decoded from DAG-CBOR and round-tripped through `JSON.stringify` so CIDs become `{"$link": …}` and bytes become `{"$bytes": …}`, which is atproto's standard JSON form.
 
 - `@atcute/repo` yields records containing `CidLink` and `Bytes` wrapper objects. Their `toJSON()` produces the atproto JSON encoding.
 - `JSON.parse(JSON.stringify(record))` looks like a pointless copy, but it's the conversion step. Without it, blob refs have no `$link` and pointer extraction can't see media.
 
 ## Record order
 
-**TL;DR:** each JSONL file is in record-key order, which is chronological for most collections. The web UI reverses a file to show newest first.
+Each JSONL file is in record-key order, which is chronological for most collections. The web UI reverses a file to show newest first.
 
 - Records come out of the repo's Merkle search tree sorted by key.
 - Bluesky and most atproto apps use TIDs (timestamp identifiers) as record keys, so key order is creation order.
@@ -51,7 +51,7 @@ archives/<handle>/
 
 ## Refs
 
-**TL;DR:** every record line carries `refs`: pointers to what it interacts with, extracted generically so any lexicon works.
+Every record line carries `refs`: pointers to what it interacts with, extracted generically so any lexicon works.
 
 | field | meaning |
 |---|---|
