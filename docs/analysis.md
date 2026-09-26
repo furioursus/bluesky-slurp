@@ -1,10 +1,10 @@
 # Analysis
 
-Offline, structural signals of good- or bad-faith engagement, computed for five time windows, each with links to the posts behind it. It never outputs a verdict. Code: `src/lib/analyze.ts`.
+Offline, structural signals of good- or bad-faith engagement, computed for five time windows, each linked to the posts behind it. It never outputs a verdict — you read the evidence and decide. Code: `src/lib/analyze.ts`.
 
 ## Signals, not verdicts
 
-No single score. Every number links to evidence, and the reader decides.
+No single score. Every number links to its evidence, and you decide.
 
 - A single "troll score" misreads people. Someone who argues with harassers all day looks "argumentative", and someone with a sarcastic friend group looks "hostile".
 - The strongest bad-faith tells are structural: who someone replies to, how often it's cold, and how fixated they are on one person. Those don't depend on reading tone.
@@ -37,4 +37,4 @@ A percentage with no denominator is `null`, never `0`. "No data" must never read
 
 - `pct()` returns `null` for an empty sample.
 - The UI and Markdown branch on sample sizes (`total`), not on the percentage, and say "no warm posts sampled" rather than printing a number.
-- The original bug (in the since-retired tone stat): `13.3/0`, which reads as a division by zero and would have shown a false 0% for an empty side.
+- The bug that started this (in the since-retired tone stat) rendered `13.3/0`, which reads as a division by zero and would've shown a false 0% for an empty side.

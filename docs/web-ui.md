@@ -1,6 +1,6 @@
 # Web UI
 
-**TL;DR:** an Astro 7 app rendered on the server by the Node adapter (`npm run dev`, `npm run serve`). Pages read archives straight from disk and arrive fully rendered. Astro's `ClientRouter` swaps pages in place, so navigation feels like an SPA with no reloads, while every page is still server-rendered HTML. The browser runs a little JavaScript for the router, the job panel, handle autocomplete, the theme, blur and font controls, the thread-roots toggle, scroll keeping and click-to-reveal on sensitive media. It's local-only on purpose, and it never renders archived text as HTML.
+**TL;DR:** an Astro 7 app rendered on the server by the Node adapter (`npm run dev`, `npm run serve`). Pages read archives straight off disk and arrive fully rendered. Astro's `ClientRouter` swaps pages in place, so it feels like an SPA with no reloads while every page is still server-rendered HTML. The browser only runs a little JavaScript: the router, the job panel, handle autocomplete, the theme, blur and font controls, the thread-roots toggle, scroll keeping and click-to-reveal. It's local-only on purpose, and it never renders archived text as HTML.
 
 ## Structure
 
@@ -28,15 +28,15 @@ src/
 
 ## Security
 
-It binds to `127.0.0.1` (Astro `server.host`, plus `HOST` in `npm run serve`), middleware rejects cross-origin non-GET requests, path segments are allowlisted. The server writes to disk and runs jobs, so nothing outside this machine may reach it.
+It binds to `127.0.0.1` (Astro `server.host`, plus `HOST` in `npm run serve`), middleware rejects cross-origin non-GET requests, and path segments are allowlisted. The server writes to disk and runs jobs, so nothing outside this machine gets to reach it.
 
-- **Bind address:** `127.0.0.1`, never `0.0.0.0`. Exposing it remotely needs real auth in front (see the parked Cloudflare Access plan in project memory), not a flag flip.
+- **Bind address:** `127.0.0.1`, never `0.0.0.0`. Exposing it remotely needs real auth in front of it, not a flag flip.
 - **Origin check:** `src/middleware.ts` returns 403 for any non-GET request whose `Origin` host doesn't match the request host. This stops a malicious page from POSTing jobs here. It skips prerendered routes, which can't receive POSTs. Behind a tunnel this still holds, because it compares hosts rather than full origins.
 - **Paths:** handle, snapshot, collection and blob names must match `^[A-Za-z0-9._:-]+$` and resolve inside the archive root (`SAFE_NAME` in `src/lib/archives.ts`). Blob and thumbnail paths also go through `accountPath` in `src/lib/serve.ts`, which rejects any name that resolves outside `archives/<handle>/blobs/` or `thumbs/` (a handle of `..` matches the allowlist).
 
 ## Rendering untrusted text
 
-Archived posts are attacker-controlled. Astro escapes every `{expression}`, so render record content only through expressions and never with `set:html`. Links go through `Ext` / `safeHref`, which allow only `http(s)`, `/` and `#`.
+Archived posts are attacker-controlled, so treat them that way. Astro escapes every `{expression}`, so render record content only through expressions and never with `set:html`. Links go through `Ext` / `safeHref`, which allow only `http(s)`, `/` and `#`.
 
 - The one client script that writes archive-derived text (`JobRunner`'s log) uses `textContent` only.
 
@@ -60,10 +60,10 @@ Archived posts are attacker-controlled. Astro escapes every `{expression}`, so r
 Likes, reposts and reply parents (plus thread roots when the `slurp-roots` cookie is set) show the target post, fetched server-side from the public AppView in batches of 25 and cached for 10 minutes. `undefined` means the AppView couldn't be reached; `null` means it has no such post. Those render differently.
 
 - `null` renders as "Post unavailable": deleted, taken down, or hidden from logged-out viewers. The pointer still records which post it was.
-- `undefined` renders as "Couldn't load this post" with a link to bsky.app. A network failure must never be presented as a deletion.
+- `undefined` renders as "Couldn't load this post" with a link to bsky.app. A network hiccup must never pass itself off as a deletion.
 - Pointer labels resolve DIDs to `@handles` server-side too (`getHandles`, same cache).
 - Images on posts or authors labelled `porn`, `sexual`, `nudity`, `graphic-media` or `gore` are blurred until clicked, unless blur is off. See [Sensitive media](#sensitive-media).
-- Media not on disk loads from the account's PDS (the user's choice).
+- Media that isn't on disk loads from the account's PDS. That's deliberate: i'd rather see the image than a blank box.
 
 ## Fonts
 
@@ -75,7 +75,7 @@ No web fonts. Text uses a [Modern Font Stacks](https://github.com/system-fonts/m
 - **Before paint:** the inline script in `Base.astro` reads `slurp-font`, sets `--font` and `data-font` on `<html>`, and sizes the wordmark (next bullet). It gets the catalogue via `define:vars`, which `astro check` can't see, hence its two "could not find name 'fonts'" hints. It duplicates `applyFont` in `fonts.ts` because inline scripts can't import, so keep them in step. An unknown saved key falls back to the default.
 - **Wordmark:** "SLURP" is sized from its glyph width (see [Masthead](#masthead)), which differs per font, so both the inline script and `applyFont` measure it with canvas `measureText` at 100px and set `--wordmark-glyphs`. System fonts need no loading, so the measurement is right the first time. Checked with Neo-Grotesque, Industrial, Didone, Monospace Code and Handwritten: the ink width matched the cell's content width (523px) every time, with no horizontal overflow.
 - **Across swaps:** `FontPicker` copies `data-font`, `--font` and `--wordmark-glyphs` onto the incoming document in `astro:before-swap`, like the theme and blur. The picker itself is `transition:persist`.
-- **Privacy:** removing Google Fonts means pages make no third-party request for type.
+- **Privacy:** no Google Fonts means no third-party request just to render type.
 
 ## Handle autocomplete
 
@@ -90,17 +90,17 @@ The handle box on the home page suggests up to 8 accounts as you type: up to 3 a
 
 ## Design
 
-A brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, system font stacks (see [Fonts](#fonts)), uppercase headings, no radius or shadow, light and dark themes. Media and avatars show in full colour (the reference's grayscale-until-hover was dropped on 2026-09-25); only the sensitive-media blur stays grey. Tokens are global, and every component owns its own CSS.
+A brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, system font stacks (see [Fonts](#fonts)), uppercase headings, no radius or shadow, light and dark themes. Media and avatars show in full colour (i dropped the reference's grayscale-until-hover on 2026-09-25); only the sensitive-media blur stays grey. Tokens are global, and every component owns its own CSS.
 
 - **Tokens:** every length, size, type step, tracking and leading value is a custom property on `:root` in `src/styles/global.css`. Rules use `var(--…)` or a `calc()` of tokens. Inline `style` is reserved for data-driven values: chart bar widths and heights, and the font picker's per-option sample and the `--font` / `--wordmark-glyphs` it sets on `<html>`.
 - **One page breakpoint:** `@custom-media --narrow` in `src/styles/media.css` (which also holds `--hover-motion`, see [Hover previews](#hover-previews)), injected into every stylesheet by `@csstools/postcss-global-data` + `postcss-custom-media` (see `postcss.config.mjs`). Components write `@media (--narrow)`, and `860px` appears exactly once. The masthead is the exception: it responds to its own width with a container query (see [Masthead](#masthead)).
 - **Scales:** spacing `--space-3xs` to `--space-xl` (2px to 32px), type `--text-2xs` to `--text-lg` plus four fluid display sizes, tracking `--track` / `--track-wide`, and `--control` (2.75rem) as the minimum tap target.
 - **Scoped styles:** a component's `<style>` is scoped to its own template. `Grid` and `Cell` spread their props onto their root element, so a parent's scope attribute reaches them and `class` passed from a parent stays styleable. Use `:global()` only for classes applied through `Ext` (`blurred`, `link-card-link`).
 - **One line, never two:** a grid nested inside a cell drops its own bottom border (`.cell .grid`), since the outer grid already draws that edge. Nested content that needs lines should be full-bleed cells in the same grid, not a grid floating inside padding. A 2-column grid with an odd number of cells stretches the last one across the row, so the ink background never shows through as a black block.
-- **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference, with the blur toggle and font picker beside it (same `.corner-toggle` box, sharing one line). `body` has bottom padding so the last row can always scroll clear of it, after it was found covering the Proceed button.
+- **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference, with the blur toggle and font picker beside it (same `.corner-toggle` box, sharing one line). `body` has bottom padding so the last row can always scroll clear of it. It once sat right on top of the Proceed button.
 - **Theme before paint:** an inline script in `Base.astro` applies the saved theme before first paint so night mode doesn't flash white. On router swaps the router copies the new page's `<html>` attributes, which would drop `data-theme`, so `ThemeToggle` writes the current theme onto the incoming document in `astro:before-swap`. The toggle itself is `transition:persist`.
 - **Scroll:** see [Scroll](#scroll).
-- **Stale component modules in dev:** after editing an `.astro` file, Astro 7's dev server has twice served the old compiled `<style>` or `<script>` for that component (fetched with `cache: no-store`), while the file watcher reported the change and the markup updated. If an edit seems to do nothing, restart `npm run dev` before debugging the code. A production build never has this problem.
+- **Stale component modules in dev:** after editing an `.astro` file, Astro 7's dev server has twice served the old compiled `<style>` or `<script>` for that component (fetched with `cache: no-store`), while the file watcher reported the change and the markup updated. If an edit seems to do nothing, restart `npm run dev` before you go debugging perfectly fine code. A production build never has this problem.
 
 ## Media
 
@@ -179,7 +179,7 @@ Wherever a record is shown (Records tab, media "Used in"), it links back to wher
 | teal.fm, Streamplace, Anisota, bsky38 | none: no public per-user or per-record pages found | record viewer only |
 
 - **Profile fallback:** a record with no page of its own, in an app with a known profile page, links to the profile as "`<App>` profile". That's skipped when the record already links to its own place in the app (a Popfeed list item, an atmoBB thread).
-- **Researched 2026-09-25**, spot-checked by page title against `furioursus.dev`'s real records. Apps change routes, so re-check before trusting an old "verified".
+- **Researched 2026-09-25**, spot-checked by page title against my own (`furioursus.dev`) real records. Apps change routes, so re-check before you trust an old "verified".
 - **Adding an app:** add an entry under its NSID namespace (first two segments) in `APPS`, with `verified(...)` only after opening the URL for a real record and seeing that record's content. For links that need data from the record, add a `RECORD_DERIVED` entry. Media uses store record links in `media-index.json`, so bump `INDEX_VERSION` in `src/lib/media.ts` when those change.
 
 ## Scroll

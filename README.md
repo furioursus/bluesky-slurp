@@ -2,11 +2,11 @@
 
 [![Node ≥ 23.6](https://img.shields.io/badge/node-%E2%89%A5%2023.6-000?style=flat-square&logo=nodedotjs)](package.json) [![Astro](https://img.shields.io/github/package-json/dependency-version/furioursus/bluesky-slurp/astro?style=flat-square&color=000&logo=astro)](https://astro.build) [![atproto](https://img.shields.io/badge/atproto-archiver-000?style=flat-square&logo=bluesky)](https://atproto.com) [![MIT license](https://img.shields.io/badge/license-MIT-000?style=flat-square)](LICENSE)
 
-**TL;DR:** `slurp <handle>` archives everything an atproto account has publicly put on the network, from every app, not just Bluesky. Every interaction carries a clickable pointer to what it targets. Media is opt-in (`--media`). `slurp analyze <handle>` turns an archive into a behavior and interests report built from signals and evidence links. It never gives a verdict.
+**TL;DR:** hand `slurp` any atproto handle and it archives everything that account has publicly put on the network — every app, not just Bluesky. Every interaction carries a clickable pointer to whatever it targets. Media is opt-in (`--media`), because it can eat gigabytes. `slurp analyze <handle>` turns an archive into a behavior and interests report built from signals and evidence links. It never hands down a verdict; that part's on you.
 
 ## Docs
 
-The "why" behind the code lives here. Code has no comments except one-line links into these files for traps and security choices.
+The "why" lives here, not in the code. The only comments are one-line links back into these files, for traps and security calls.
 
 | doc | covers |
 |---|---|
@@ -16,7 +16,7 @@ The "why" behind the code lives here. Code has no comments except one-line links
 
 ## Usage
 
-Node ≥ 23.6, `npm install`. The CLI runs directly with no build (`npm run slurp -- <args>`). The web UI is Astro: `npm run dev`. Video poster frames in the media wall need `ffmpeg` on `PATH` (`brew install ffmpeg`); without it, video tiles show just a ▶ badge.
+Node ≥ 23.6 and `npm install`. The CLI runs straight from source with no build step (`npm run slurp -- <args>`), and the web UI is Astro (`npm run dev`). Video poster frames on the media wall need `ffmpeg` on your `PATH` (`brew install ffmpeg`); without it, video tiles just get a ▶ badge.
 
 ```sh
 npm install
@@ -27,11 +27,11 @@ npm run slurp -- analyze furioursus.dev           # report on the latest existin
 npm run slurp -- media furioursus.dev             # download media for the latest snapshot, later
 ```
 
-Input can be a handle, `@handle`, a DID (`did:plc:…` / `did:web:…`), an `at://` URI, or a `bsky.app/profile/…` URL. `--out <dir>` changes the archive root (default `./archives`).
+Input can be a handle, `@handle`, a DID (`did:plc:…` / `did:web:…`), an `at://` URI, or a `bsky.app/profile/…` URL — whatever you've got handy. `--out <dir>` changes the archive root (default `./archives`).
 
 ## Web UI
 
-`npm run dev` → http://127.0.0.1:4747. It's an Astro 7 app rendered on the server over the same engine as the CLI: archive an account, read the report, browse every record with its pointers, and browse downloaded media. Details in [docs/web-ui.md](docs/web-ui.md).
+Run `npm run dev`, then open http://127.0.0.1:4747. It's an Astro 7 app rendered on the server over the same engine as the CLI: archive an account, read its report, and browse every record (pointers included) and every downloaded file. The details live in [docs/web-ui.md](docs/web-ui.md).
 
 | command | what it does |
 |---|---|
@@ -40,7 +40,7 @@ Input can be a handle, `@handle`, a DID (`did:plc:…` / `did:web:…`), an `at:
 | `npm run serve` | production build, then the built Node server on 127.0.0.1:4747 |
 | `npm run check` | `astro check`: types for `.astro` and `src/lib` |
 
-- **Local only:** it binds to `127.0.0.1` and rejects cross-origin POSTs, because it writes to disk and runs jobs.
+- **Local only:** it binds to `127.0.0.1` and rejects cross-origin POSTs, because it writes to disk and runs jobs. Don't put it on the open internet as-is.
 - **Screens:** New archive (form, then a live log), Accounts, and per account: Report / Records / Media / Identity. Pages are real URLs, e.g. `/a/<handle>/<snapshot>/report?w=30d`. Navigation swaps pages in place (Astro `ClientRouter`).
 - **Archive location:** `SLURP_ARCHIVES=/path npm run dev` points the UI at another archive root (default `./archives`).
 
@@ -59,8 +59,8 @@ src/pages/a/[handle]/[snapshot]/records/[...collection].astro:35
 ```
 
 - **Limits:** content injected with `set:html` has no line of its own (this project doesn't use it). Framework components without a `client:*` directive can't be named (this project has none).
-- **Why it exists:** Astro 7 compiles through `@astrojs/compiler-rs`, which accepts `annotateSourceFile` but emits nothing, so the dev toolbar's built-in source annotation is silently gone.
-- **Install:** a devDependency pinned to the `v1.0.0` HTTPS tarball of `furioursus/astro-pathfinder`, not a `github:` spec (which locks as `git+ssh`). It's a no-op unless `INSPECT=1` and the command is `dev`. An `INSPECT=1` build was verified to contain no markers.
+- **Why it exists:** Astro 7 compiles through `@astrojs/compiler-rs`, which happily accepts `annotateSourceFile` and then emits nothing, so the dev toolbar's source annotation is just… gone.
+- **Install:** a devDependency pinned to the `v1.0.0` HTTPS tarball of `furioursus/astro-pathfinder`, not a `github:` spec (which locks as `git+ssh`). It's a no-op unless `INSPECT=1` and the command is `dev`. i verified an `INSPECT=1` build contains no markers.
 
 ## What gets archived
 
@@ -108,7 +108,7 @@ Each JSONL line has `uri` + `web` for the record itself and a `refs` array for e
 
 ## Analysis
 
-Structural signals of good- or bad-faith engagement, plus interests. Offline except one batched handle lookup. Read the linked posts before concluding anything.
+Structural signals of good- or bad-faith engagement, plus interests. It's offline except for one batched handle lookup. Read the linked posts before you conclude anything about anyone.
 
 - **Time windows:** every stat is computed for the last 30 days, 3 months, 6 months, 1 year, and all time, counted back from the snapshot date. The web UI switches between them instantly. `analysis.md` shows all time plus an "Over time" comparison table.
 - **Shape:** original vs self-thread vs reply vs quote, likes per post, cadence.
@@ -120,7 +120,7 @@ Structural signals of good- or bad-faith engagement, plus interests. Offline exc
 Caveats:
 - "Followed" means followed *at snapshot time*, in every window. Old replies to people they've since unfollowed count as cold.
 - Many blocks usually means block lists or self-defense, not aggression.
-- Text isn't read, only structure.
+- It never reads text, only structure.
 
 ## License
 

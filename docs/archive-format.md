@@ -1,6 +1,6 @@
 # Archive format
 
-One directory per account, one timestamped snapshot per run. Each snapshot holds the raw signed repo (`repo.car`) plus every record decoded to JSONL, with a `refs` array of pointers per record. Media is shared across snapshots under `blobs/`. Code: `src/lib/archive.ts`, `src/lib/refs.ts`.
+One directory per account, and a fresh timestamped snapshot every time you run it. Each snapshot holds the raw signed repo (`repo.car`) plus every record decoded to JSONL, with a `refs` array of pointers per record. Media is shared across snapshots under `blobs/`. Code: `src/lib/archive.ts`, `src/lib/refs.ts`.
 
 ## Layout
 
