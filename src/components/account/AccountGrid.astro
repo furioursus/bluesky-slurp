@@ -1,6 +1,6 @@
 ---
 import type { AccountSummary } from '../../lib/archives.ts';
-import { day, plural } from '../../lib/format.ts';
+import { day, fmt, plural } from '../../lib/format.ts';
 import Grid from '../ui/Grid.astro';
 
 interface Props {
@@ -12,19 +12,18 @@ const { accounts } = Astro.props;
 
 <Grid cols="2">
   {
-    accounts.map((a) => {
-      const s = a.snapshots[0];
-      return (
-        <a class="cell card" href={`/a/${a.handle}/${s.snapshot}/report`}>
-          {a.avatar ? <img class="avatar" src={a.avatar} alt="" loading="lazy" /> : <div class="avatar" />}
-          <div>
-            <div class="break handle">@{a.handle}</div>
-            {a.displayName && <div class="break">{a.displayName}</div>}
-            <div class="muted text-xs">{plural(s.totalRecords, 'record')} · {plural(a.snapshots.length, 'snapshot')} · {day(s.fetchedAt)}</div>
+    accounts.map((a) => (
+      <a class="cell card" href={`/a/${a.handle}/report`}>
+        {a.avatar ? <img class="avatar" src={a.avatar} alt="" loading="lazy" /> : <div class="avatar" />}
+        <div>
+          <div class="break handle">@{a.handle}</div>
+          {a.displayName && <div class="break">{a.displayName}</div>}
+          <div class="muted text-xs">
+            {a.legacy ? 'old format · update to convert' : <>{plural(a.totalRecords, 'record')}{a.deletedRecords > 0 && ` + ${fmt(a.deletedRecords)} deleted`} · updated {day(a.updatedAt)}</>}
           </div>
-        </a>
-      );
-    })
+        </div>
+      </a>
+    ))
   }
 </Grid>
 

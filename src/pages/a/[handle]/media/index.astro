@@ -1,38 +1,38 @@
 ---
-import MediaDownload from '../../../../../components/media/MediaDownload.astro';
-import MediaFilters from '../../../../../components/media/MediaFilters.astro';
-import MediaWall from '../../../../../components/media/MediaWall.astro';
-import Pager from '../../../../../components/records/Pager.astro';
-import Cell from '../../../../../components/ui/Cell.astro';
-import Grid from '../../../../../components/ui/Grid.astro';
-import Stat from '../../../../../components/ui/Stat.astro';
-import AccountLayout from '../../../../../layouts/AccountLayout.astro';
-import { loadSnapshot } from '../../../../../lib/archives.ts';
-import { fmt, plural } from '../../../../../lib/format.ts';
-import { loadMediaIndex, localBlobBytes, localBlobFiles } from '../../../../../lib/media.ts';
-import { filterMedia, KIND_LABEL, mediaSearch, onDisk, PER_PAGE_COOKIE, perFromUrl, readMediaQuery, sourceLabel } from '../../../../../lib/media-view.ts';
+import MediaDownload from '../../../../components/media/MediaDownload.astro';
+import MediaFilters from '../../../../components/media/MediaFilters.astro';
+import MediaWall from '../../../../components/media/MediaWall.astro';
+import Pager from '../../../../components/records/Pager.astro';
+import Cell from '../../../../components/ui/Cell.astro';
+import Grid from '../../../../components/ui/Grid.astro';
+import Stat from '../../../../components/ui/Stat.astro';
+import AccountLayout from '../../../../layouts/AccountLayout.astro';
+import { loadArchive } from '../../../../lib/archives.ts';
+import { fmt, plural } from '../../../../lib/format.ts';
+import { loadMediaIndex, localBlobBytes, localBlobFiles } from '../../../../lib/media.ts';
+import { filterMedia, KIND_LABEL, mediaSearch, onDisk, PER_PAGE_COOKIE, perFromUrl, readMediaQuery, sourceLabel } from '../../../../lib/media-view.ts';
 
 const GB = 1e9;
-const { handle = '', snapshot = '' } = Astro.params;
-const snap = await loadSnapshot(handle, snapshot);
-const all = snap ? await loadMediaIndex(snap.dir) : [];
-const files = snap ? await localBlobFiles(snap.dir) : new Set<string>();
+const { handle = '' } = Astro.params;
+const archive = await loadArchive(handle);
+const all = archive ? await loadMediaIndex(archive.dir) : [];
+const files = archive ? await localBlobFiles(archive.dir) : new Set<string>();
 const downloaded = onDisk(all, files);
-const bytes = snap ? await localBlobBytes(snap.dir, downloaded.map((i) => i.file)) : 0;
+const bytes = archive ? await localBlobBytes(archive.dir, downloaded.map((i) => i.file)) : 0;
 const missing = all.length - downloaded.length;
 const YEAR = 60 * 60 * 24 * 365;
 const query = readMediaQuery(Astro.url, Astro.cookies.get(PER_PAGE_COOKIE)?.value);
 if (perFromUrl(Astro.url)) Astro.cookies.set(PER_PAGE_COOKIE, String(query.per), { path: '/', maxAge: YEAR, sameSite: 'lax' });
 const shown = filterMedia(downloaded, query);
 const page = shown.slice(query.offset, query.offset + query.per);
-const base = `/a/${handle}/${snapshot}/media`;
+const base = `/a/${handle}/media`;
 const href = (o: number, order: 'newest' | 'oldest' = query.order) => `${base}${mediaSearch(query, { offset: o, order })}`;
 const detail = (cid: string) => `${base}/${cid}${mediaSearch(query, { offset: 0 })}`;
 ---
 
-<AccountLayout snap={snap} tab="media">
+<AccountLayout archive={archive} tab="media">
   <Grid cols="4">
-    <Stat kicker="On disk" value={fmt(downloaded.length)} note={`of ${plural(all.length, 'file')} this snapshot references`} />
+    <Stat kicker="On disk" value={fmt(downloaded.length)} note={`of ${plural(all.length, 'file')} this archive references`} />
     <Stat kicker="Size" value={`${(bytes / GB).toFixed(2)} GB`} note="in this account’s blobs folder" />
     <Stat kicker="Images / video" value={`${fmt(downloaded.filter((i) => i.kind === 'image').length)} / ${fmt(downloaded.filter((i) => i.kind === 'video').length)}`} note="downloaded" />
     <Stat kicker="Not downloaded" value={fmt(missing)} note={missing ? 'shown in Records from the PDS' : 'everything is local'} />
@@ -42,9 +42,9 @@ const detail = (cid: string) => `${base}/${cid}${mediaSearch(query, { offset: 0 
       <Grid cols="side">
         <Cell stack="sm">
           <h2 class="subtitle">{downloaded.length ? 'Fill the gaps' : 'No media downloaded yet'}</h2>
-          <p class="muted">{downloaded.length ? 'Some files this snapshot references aren’t on disk.' : 'This account was archived without media. Download it to browse it here.'}</p>
+          <p class="muted">{downloaded.length ? 'Some files this archive references aren’t on disk.' : 'This account was archived without media. Download it to browse it here.'}</p>
         </Cell>
-        <Cell><MediaDownload handle={handle} snapshot={snapshot} missing={missing} /></Cell>
+        <Cell><MediaDownload handle={handle} missing={missing} /></Cell>
       </Grid>
     )
   }

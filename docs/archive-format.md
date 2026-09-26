@@ -1,38 +1,66 @@
 # Archive format
 
-One directory per account, and a fresh timestamped snapshot every time you run it. Each snapshot holds the raw signed repo (`repo.car`) plus every record decoded to JSONL, with a `refs` array of pointers per record. Media is shared across snapshots under `blobs/`. Code: `src/lib/archive.ts`, `src/lib/refs.ts`.
+One living archive per account. Running Slurp again updates it in place: new and edited records merge in, and anything deleted since stays, flagged. Each archive holds the latest raw signed repo (`repo.car`) plus every record ever seen, decoded to JSONL with a `refs` array of pointers per record. Code: `src/lib/archive.ts`, `src/lib/refs.ts`.
 
 ## Layout
 
-Each run writes `archives/<handle>/snapshots/<UTC timestamp>/`. Next to the snapshots sit `blobs/` once media is downloaded and `thumbs/` once the web UI has shown it.
+Everything for one person lives in `archives/<handle>/`. `blobs/` shows up once media is downloaded and `thumbs/` once the web UI has shown it.
 
 ```
 archives/<handle>/
+  manifest.json
+  repo.car                          # the latest export, replaced on every update
+  records/<collection>.jsonl        # every record ever seen, deleted ones flagged
+  identity/did-document.json
+  identity/plc-audit-log.json
+  bsky-profile.json
+  analysis.json / analysis.md
+  media-index.json
   blobs/<cid>.<ext>
-  thumbs/<cid>.<ext>.webp            # web UI tile cache, safe to delete (see web-ui.md#thumbnails)
-  snapshots/<timestamp>/
-    manifest.json
-    repo.car
-    records/<collection>.jsonl
-    identity/did-document.json
-    identity/plc-audit-log.json
-    bsky-profile.json
-    analysis.json / analysis.md
-    media-index.json
+  thumbs/<cid>.<ext>.webp           # web UI tile cache, safe to delete (see web-ui.md#thumbnails)
+  retired/                          # data from retired features, kept but unused
 ```
 
 - The directory is named by handle, with a `did_plc_…` fallback when there's no handle. Handles change, so `manifest.json` holds the DID and the full handle history.
-- The snapshot timestamp swaps `:` for `-` so it's safe as a directory name.
+- Updates find the folder by DID, not handle. If someone changes their handle, the next update renames the folder to match.
 - `blobs/` is keyed by CID, which is content-addressed. A file that already exists is never downloaded again.
+
+## Updates
+
+Every update downloads the account's whole current repo, then merges it into what's already there, one collection at a time. Nothing you've archived is ever dropped.
+
+| case | what happens |
+|---|---|
+| new record | added with `firstSeen` and `lastSeen` set to this update |
+| same record, same CID | kept; `lastSeen` moves to this update |
+| same rkey, new CID (edited) | replaced by the new version, keeping its `firstSeen` |
+| gone from the repo | kept, with `deletedAt` set to this update; `lastSeen` stays the last update that saw it |
+| flagged deleted, then back | `deletedAt` removed, counted as restored |
+
+- **Line fields:** besides `uri`, `web`, `cid`, `collection`, `rkey`, `createdAt`, `refs` and `record`, every JSONL line carries `firstSeen`, `lastSeen` and, when deleted, `deletedAt`, always as the last key. The web UI's "deleted only" filter relies on that last-key position, so a record's own content can't fake it.
+- **Why keep deleted records:** an archive that quietly forgets deleted posts misses half the point. "Last seen" is as precise as it gets, since the repo doesn't say when something was deleted, only that it's gone.
+- **Edits keep only the newest version.** Most Bluesky records can't be edited anyway; profiles and lists are the ones that change.
+- **Manifest:** `totalRecords` and `counts` are live records only; `deletedRecords` and `deleted` count the flagged ones. `fetchedAt` is the last update, `firstArchivedAt` the first, and `updates[]` logs every run as `{ at, added, changed, deleted, restored, live, total }`.
+- **Crash safety:** the new export is written to `.incoming/` first, and every collection file and JSON file (manifest, report, media index) is replaced through a temp file and a rename. An interrupted update leaves the previous archive readable, and a page rendered mid-update never sees a half-written manifest. The next update clears `.incoming/`.
+- **Reports and media follow along:** an update re-runs the analysis whenever the archive already has one, and drops `media-index.json` so the web UI rebuilds it.
+
+## Migrating old snapshots
+
+Archives from before 2026-09-26 kept a timestamped `snapshots/<run>/` folder per run. `slurp migrate` folds them into one archive, and so does the first update of such an account (the web UI shows those accounts as "old format · update to convert").
+
+- **Order:** snapshots merge oldest first through the same merge as updates, so anything deleted between two runs gets flagged with the later run's time.
+- **Checked before anything's deleted:** the live count has to equal the newest snapshot's record count, and the total has to equal every record any snapshot ever held. If either is off, the merge is thrown away and nothing changes.
+- **What's kept:** the newest snapshot's `repo.car`, identity files, profile and report. Files from retired features move to `retired/`. Then the `snapshots/` folder is deleted.
+- **Dry run by default:** `npm run slurp -- migrate` only checks and reports; add `--write` to convert. Old `/a/<handle>/<snapshot>/…` links redirect to the new URLs.
 
 ## Media
 
-Downloaded files live once per account in `blobs/<cid>.<ext>` and are shared by every snapshot. `media-index.json` in a snapshot lists every file that snapshot references and the records that use it.
+Downloaded files live once per account in `blobs/<cid>.<ext>`. `media-index.json` lists every file the archive references, deleted records included, and the records that use it.
 
 - Files are written as `<cid>.part`, then renamed, so an interrupted download never leaves a truncated file under its real name.
 - The extension comes from the MIME type (`jpg`, `png`, `webp`, `gif`, `heic`, `avif`, `mp4`, `mov`, `webm`, `mp3`, `pdf`), otherwise `bin`.
 - `media-index.json` is `{ version, items[] }` with each item `{ cid, mimeType, kind, file, at, uses[] }`, newest first. It's derived data: delete it and the UI rebuilds it.
-- `manifest.media` records `{ enabled, referenced, downloaded, alreadyHad, failed[] }` from the last media download, whether at archive time or later.
+- `manifest.media` records `{ enabled, referenced, downloaded, alreadyHad, failed[] }` from the last media download, whether at archive time or later. Once `enabled` is true, every update also fetches media for new records. The app's launch update, and Update all unless you tick **Include media**, skip media for that run only; skipping never turns the setting off.
 
 ## Record JSON
 

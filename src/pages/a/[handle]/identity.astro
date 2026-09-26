@@ -1,22 +1,22 @@
 ---
-import Cell from '../../../../components/ui/Cell.astro';
-import Ext from '../../../../components/ui/Ext.astro';
-import Grid from '../../../../components/ui/Grid.astro';
-import AccountLayout from '../../../../layouts/AccountLayout.astro';
-import { loadIdentity, loadSnapshot } from '../../../../lib/archives.ts';
-import { day, fmt } from '../../../../lib/format.ts';
+import Cell from '../../../components/ui/Cell.astro';
+import Ext from '../../../components/ui/Ext.astro';
+import Grid from '../../../components/ui/Grid.astro';
+import AccountLayout from '../../../layouts/AccountLayout.astro';
+import { loadIdentity, loadArchive } from '../../../lib/archives.ts';
+import { day, fmt } from '../../../lib/format.ts';
 
 const PLC_OPS_SHOWN = 12;
 
-const { handle = '', snapshot = '' } = Astro.params;
-const snap = await loadSnapshot(handle, snapshot);
-const m = snap?.manifest;
-const id = snap ? await loadIdentity(snap.dir) : null;
+const { handle = '' } = Astro.params;
+const archive = await loadArchive(handle);
+const m = archive?.manifest;
+const id = archive ? await loadIdentity(archive.dir) : null;
 const services: any[] = id?.didDocument?.service ?? [];
 const ops = [...(id?.plcAuditLog ?? [])].reverse();
 ---
 
-<AccountLayout snap={snap} tab="identity">
+<AccountLayout archive={archive} tab="identity">
   {
     m && (
       <>

@@ -1,0 +1,21 @@
+---
+import Cell from '../ui/Cell.astro';
+import Grid from '../ui/Grid.astro';
+import JobRunner from './JobRunner.astro';
+
+interface Props {
+  handle: string;
+  label?: string;
+}
+
+const { handle, label = 'Update' } = Astro.props;
+---
+
+<JobRunner mode="archive" input={handle} after="reload">
+  <form>
+    <Grid cols="side">
+      <Cell stack="sm"><slot /></Cell>
+      <Cell><div class="btn-row"><button class="btn solid" type="submit">{label}</button></div></Cell>
+    </Grid>
+  </form>
+</JobRunner>

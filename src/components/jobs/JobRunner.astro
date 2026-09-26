@@ -1,15 +1,17 @@
 ---
+import type { JobMode } from '../../lib/jobs.ts';
+
 interface Props {
-  mode: 'archive' | 'analyze' | 'media';
+  mode: JobMode;
   input?: string;
-  snapshot?: string;
   after: 'open' | 'reload';
+  attach?: string | null;
 }
 
-const { mode, input, snapshot, after } = Astro.props;
+const { mode, input, after, attach } = Astro.props;
 ---
 
-<job-runner data-mode={mode} data-input={input} data-snapshot={snapshot} data-after={after}>
+<job-runner data-mode={mode} data-input={input} data-after={after} data-attach={attach ?? undefined}>
   <slot />
   <div data-panel-slot></div>
   <template>
@@ -35,7 +37,7 @@ const { mode, input, snapshot, after } = Astro.props;
   type JobEvent = { type: 'log' | 'done' | 'error'; data: any };
 
   const AUTO_RELOAD_MS = 600;
-  const TITLES: Record<string, string> = { archive: 'Archiving', analyze: 'Analyzing', media: 'Downloading media for' };
+  const TITLES: Record<string, string> = { archive: 'Archiving', analyze: 'Analyzing', media: 'Downloading media for', 'update-all': 'Updating every account' };
 
   const refresh = () => {
     keepScrollOnNextSwap();
@@ -47,6 +49,67 @@ const { mode, input, snapshot, after } = Astro.props;
 
     connectedCallback() {
       this.querySelector('form')?.addEventListener('submit', (e) => this.start(e as SubmitEvent));
+      if (this.dataset.attach) this.follow(this.dataset.attach, this.heading(this.dataset.input ?? ''));
+    }
+
+    heading(input: string) {
+      const { mode } = this.dataset;
+      return mode === 'update-all' ? TITLES[mode] : `${TITLES[mode ?? 'analyze'] ?? 'Running'} ${input}`;
+    }
+
+    panel(title: string) {
+      const panel = (this.querySelector('template')!.content.firstElementChild as HTMLElement).cloneNode(true) as HTMLElement;
+      const $ = <T extends HTMLElement>(sel: string) => panel.querySelector<T>(sel)!;
+      $('[data-title]').textContent = title;
+      this.querySelector('[data-panel-slot]')!.replaceChildren(panel);
+      const log = $('[data-log]');
+      return {
+        $,
+        status: (text: string) => ($('[data-status]').textContent = text),
+        append: (line: string) => {
+          const span = document.createElement('span');
+          if (/⚠|error/.test(line)) span.className = 'warn';
+          span.textContent = `${line}\n`;
+          log.append(span);
+          log.scrollTop = log.scrollHeight;
+        },
+      };
+    }
+
+    buttons(disabled: boolean) {
+      for (const b of this.querySelectorAll('button')) b.disabled = disabled;
+    }
+
+    follow(id: string, title: string, ui = this.panel(title)) {
+      const { after } = this.dataset;
+      ui.status('running');
+      this.buttons(true);
+      const events = (this.events = new EventSource(`/api/jobs/${id}/events`));
+      events.onmessage = (msg) => {
+        const ev: JobEvent = JSON.parse(msg.data);
+        if (ev.type === 'log') ui.append(ev.data);
+        if (ev.type === 'error') {
+          ui.append(`error: ${ev.data}`);
+          ui.status('failed');
+          events.close();
+          this.buttons(false);
+        }
+        if (ev.type === 'done') {
+          ui.status('done');
+          events.close();
+          this.buttons(false);
+          ui.$('[data-finish]').hidden = false;
+          if (after === 'open' && ev.data?.handle) {
+            const open = ui.$<HTMLAnchorElement>('[data-open]');
+            open.href = `/a/${ev.data.handle}/report`;
+            open.textContent = `Open ${ev.data.handle}`;
+            open.hidden = false;
+          } else {
+            ui.status('done, reloading');
+            setTimeout(refresh, AUTO_RELOAD_MS);
+          }
+        }
+      };
     }
 
     disconnectedCallback() {
@@ -55,72 +118,25 @@ const { mode, input, snapshot, after } = Astro.props;
 
     async start(e: SubmitEvent) {
       e.preventDefault();
-      const form = e.target as HTMLFormElement;
-      const fd = new FormData(form);
-      const { mode, input, snapshot, after } = this.dataset;
-      const request = {
-        mode,
-        input: input ?? String(fd.get('input') ?? ''),
-        snapshot,
-        media: fd.has('media'),
-        analyze: fd.has('analyze'),
-      };
-      for (const b of form.querySelectorAll('button')) b.disabled = true;
-
-      const panel = (this.querySelector('template')!.content.firstElementChild as HTMLElement).cloneNode(true) as HTMLElement;
-      const $ = <T extends HTMLElement>(sel: string) => panel.querySelector<T>(sel)!;
-      $('[data-title]').textContent = `${TITLES[mode ?? 'analyze'] ?? 'Running'} ${request.input}`;
-      this.querySelector('[data-panel-slot]')!.replaceChildren(panel);
-      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-      const status = (text: string) => ($('[data-status]').textContent = text);
-      const log = $('[data-log]');
-      const append = (line: string) => {
-        const span = document.createElement('span');
-        if (/⚠|error/.test(line)) span.className = 'warn';
-        span.textContent = `${line}\n`;
-        log.append(span);
-        log.scrollTop = log.scrollHeight;
-      };
-      const finish = () => {
-        for (const b of form.querySelectorAll('button')) b.disabled = false;
-      };
+      const fd = new FormData(e.target as HTMLFormElement);
+      const { mode, input } = this.dataset;
+      const request = { mode, input: input ?? String(fd.get('input') ?? ''), media: fd.has('media'), analyze: fd.has('analyze') };
+      this.buttons(true);
+      const ui = this.panel(this.heading(request.input));
+      this.querySelector('[data-panel-slot]')!.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
       const res = await fetch('/api/jobs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request) });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        append(`error: ${body.error ?? res.status}`);
-        status('failed');
-        return finish();
+      if (res.status === 409 && body.id) {
+        ui.append(body.error);
+        return this.follow(body.id, this.heading(request.input), ui);
       }
-      status('running');
-
-      const events = (this.events = new EventSource(`/api/jobs/${body.id}/events`));
-      events.onmessage = (msg) => {
-        const ev: JobEvent = JSON.parse(msg.data);
-        if (ev.type === 'log') append(ev.data);
-        if (ev.type === 'error') {
-          append(`error: ${ev.data}`);
-          status('failed');
-          events.close();
-          finish();
-        }
-        if (ev.type === 'done') {
-          status('done');
-          events.close();
-          finish();
-          $('[data-finish]').hidden = false;
-          if (after === 'open') {
-            const open = $<HTMLAnchorElement>('[data-open]');
-            open.href = `/a/${ev.data.handle}/${ev.data.snapshot}/report`;
-            open.textContent = `Open ${ev.data.handle}`;
-            open.hidden = false;
-          } else {
-            status('done, reloading');
-            setTimeout(refresh, AUTO_RELOAD_MS);
-          }
-        }
-      };
+      if (!res.ok) {
+        ui.append(`error: ${body.error ?? res.status}`);
+        ui.status('failed');
+        return this.buttons(false);
+      }
+      this.follow(body.id, this.heading(request.input), ui);
     }
   }
 

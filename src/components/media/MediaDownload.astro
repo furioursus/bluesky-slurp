@@ -4,16 +4,15 @@ import JobRunner from '../jobs/JobRunner.astro';
 
 interface Props {
   handle: string;
-  snapshot: string;
   missing: number;
 }
 
-const { handle, snapshot, missing } = Astro.props;
+const { handle, missing } = Astro.props;
 ---
 
-<JobRunner mode="media" input={handle} snapshot={snapshot} after="reload">
+<JobRunner mode="media" input={handle} after="reload">
   <form class="stack">
-    <p class="muted">Downloads every file this snapshot references into <span class="mono">archives/{handle}/blobs/</span>. Files already on disk are skipped.</p>
+    <p class="muted">Downloads every file this archive references into <span class="mono">archives/{handle}/blobs/</span>. Files already on disk are skipped, and later updates keep fetching new ones.</p>
     <div class="btn-row"><button class="btn solid" type="submit">Download {plural(missing, 'missing file')}</button></div>
   </form>
 </JobRunner>

@@ -19,8 +19,18 @@ On launch the app picks a free port, starts `dist/server/entry.mjs` in an Electr
 - **One server per app.** It lives as long as the app does. Closing the window on macOS keeps the app, and any running job, alive; clicking the Dock icon opens a new window. Quitting stops the server.
 - **One app at a time.** A second launch just focuses the first window.
 - **Menus:** the standard macOS app, Edit, View and Window menus, so copy, paste and zoom work in the handle box and everywhere else. File adds **Choose Archive Folder…** (⌘⇧O) and **Show Archive Folder**.
+- **Update on launch:** once the window is up, the app starts **Update all** in the background (records and reports, never media). See [Updating on launch](#updating-on-launch).
 - **Links:** anything pointing off the app's own server opens in your normal browser. The window never navigates away from Slurp.
 - **`PATH`:** apps launched from Finder or the Dock don't inherit your shell's `PATH`, so `ffmpeg` from Homebrew would go missing and every video poster would 404. The app adds `/opt/homebrew/bin` and `/usr/local/bin` for the server.
+
+## Updating on launch
+
+Every time the app opens, it brings every archive up to date without you doing anything: the main process POSTs `{ mode: 'update-all', media: false }` to its own server, with the token cookie and a matching `Origin`.
+
+- **Records and reports only.** Media can be gigabytes, so it only comes down from an account's own Update button or the Media tab.
+- **You can watch it.** Open Accounts while it runs and the Update all panel attaches to the job and replays the log so far.
+- **It won't collide.** If you press Update on an account meanwhile, you get the running job instead of a second one (see [web-ui.md](web-ui.md#jobs)).
+- **Offline is fine.** A network failure just logs per account; the archives stay as they were.
 
 ## Archive folder
 

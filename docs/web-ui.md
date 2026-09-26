@@ -18,7 +18,8 @@ src/
     records/      CollectionList · Pager · RootsToggle · RecordCard · RefList · PostEmbed · EmbedMedia · MediaThumbs
     media/        MediaWall · MediaFilters · MediaDownload · MediaViewer
     account/      AccountHeader · AccountGrid
-  pages/          / · /accounts · /about · /a/[handle] · /a/[handle]/[snapshot]/{report,records/[...collection],media,media/[cid],identity}
+  pages/          / · /accounts · /about · /a/[handle] · /a/[handle]/{report,records/[...collection],media,media/[cid],identity}
+                  /a/[handle]/[legacy]/[...rest] (301 from old snapshot URLs)
                   /blobs/[handle]/[file] · /thumbs/[handle]/[file] · /api/jobs · /api/jobs/[id]/events · /api/typeahead
   styles/         global.css (tokens + primitives) · media.css (the one breakpoint)
 ```
@@ -33,7 +34,7 @@ It binds to `127.0.0.1` (Astro `server.host`, plus `HOST` in `npm run serve`), m
 
 - **Bind address:** `127.0.0.1`, never `0.0.0.0`. Exposing it remotely needs real auth in front of it, not a flag flip.
 - **Origin check:** `src/middleware.ts` returns 403 for any non-GET request whose `Origin` host doesn't match the request host. This stops a malicious page from POSTing jobs here. It skips prerendered routes, which can't receive POSTs. Behind a tunnel this still holds, because it compares hosts rather than full origins.
-- **Paths:** handle, snapshot, collection and blob names must match `^[A-Za-z0-9._:-]+$` and resolve inside the archive root (`SAFE_NAME` in `src/lib/archives.ts`). Blob and thumbnail paths also go through `accountPath` in `src/lib/serve.ts`, which rejects any name that resolves outside `archives/<handle>/blobs/` or `thumbs/` (a handle of `..` matches the allowlist).
+- **Paths:** handle, collection and blob names must match `^[A-Za-z0-9._:-]+$` and resolve inside the archive root (`SAFE_NAME` in `src/lib/archives.ts`). Blob and thumbnail paths also go through `accountPath` in `src/lib/serve.ts`, which rejects any name that resolves outside `archives/<handle>/blobs/` or `thumbs/` (a handle of `..` matches the allowlist).
 - **App token:** when `SLURP_TOKEN` is set, which the desktop app does with a fresh random value every launch, middleware returns 403 for any request without a matching `slurp-token` cookie. Prerendered pages and static files skip it, since they carry no archive data. See [desktop.md](desktop.md#per-launch-token).
 
 ## Rendering untrusted text
@@ -48,14 +49,26 @@ Archived posts are attacker-controlled, so treat them that way. Astro escapes ev
 
 | route | purpose |
 |---|---|
-| `POST /api/jobs` | start `archive`, `analyze` or `media` (`{ mode, input, snapshot?, media?, analyze? }`) |
+| `POST /api/jobs` | start `archive` (create or update), `analyze`, `media` or `update-all` (`{ mode, input, media?, analyze? }`). 409 with the running job's `id` while another update runs |
 | `GET /api/jobs/:id/events` | SSE. Each event carries an `id`, and a reconnect with `Last-Event-ID` resumes rather than replaying |
 | `GET /blobs/:handle/:file` | downloaded media; `?download` adds `content-disposition: attachment` |
 
 - Jobs live in memory in the server process and are dropped an hour after they start.
-- When a job finishes, the page refreshes through the router (`navigate(current URL, { history: 'replace' })`) and keeps your scroll position. An archive job instead offers an "Open" link to the new snapshot.
+- When a job finishes, the page refreshes through the router (`navigate(current URL, { history: 'replace' })`) and keeps your scroll position. A new archive from the home page instead offers an "Open" link.
 - Navigating away mid-job closes the panel's event stream (`disconnectedCallback`). The job itself keeps running on the server.
 - Astro allows one dev server per project. To test against another archive root, build and run `dist/server/entry.mjs` with `SLURP_ARCHIVES` and `PORT` set.
+- **One update at a time:** `archive`, `media` and `update-all` all write archives, so only one runs at once (`runningWriter` in `src/lib/jobs.ts`). A second request gets a 409 with the running job's `id`, and `JobRunner` follows that job instead of failing. Analyses can run alongside.
+- **Update buttons:** every account page has an Update bar under the header (`UpdateArchive`, mode `archive`). It keeps the archive's media setting, and it re-runs the report when there is one. **Update all** on Accounts does every account in turn, records and reports, and logs a failure per account without stopping. Its **Include media** checkbox (off by default) also pulls new media for every archive that has media on.
+- **Rejoining a running job:** Accounts renders `JobRunner` with `attach` set to any running `update-all` (`activeJob`), so reloading the page, or opening it while the desktop app's launch update runs, replays the log so far and keeps following it.
+
+## Deleted records
+
+Records the person has deleted since they were archived stay in the Records tab with a solid "Deleted · last seen <date>" tag (see [archive-format.md](archive-format.md#updates)).
+
+- **Filter:** a collection with deleted records shows **All · Deleted** above its pager. `?show=deleted` narrows the list to the flagged ones and rides along in the pager links.
+- **Counts:** the collections list counts every record, deleted included. The header's big number is live records only, with "+ N deleted, kept" under it.
+- **Media:** a file used by a deleted record stays on the media wall, and its "Used in" list tags that use "deleted".
+- **Reports ignore them.** See [analysis.md](analysis.md#live-records-only).
 
 ## Embeds
 
@@ -106,11 +119,11 @@ A brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairl
 
 ## Media
 
-The Media tab (`/a/<handle>/<snapshot>/media`) is a wall of every downloaded file, filterable by type and source collection, 15 · 30 · 60 · 120 · 240 · 480 per page (default 60, remembered). Each file has a detail page with a viewer, alt text, size, download, and every record that uses it. Snapshots archived without media get a "Download media" job instead of an empty wall.
+The Media tab (`/a/<handle>/media`) is a wall of every downloaded file, filterable by type and source collection, 15 · 30 · 60 · 120 · 240 · 480 per page (default 60, remembered). Each file has a detail page with a viewer, alt text, size, download, and every record that uses it. Archives made without media get a "Download media" job instead of an empty wall.
 
-- **Index:** `src/lib/media.ts` scans the snapshot's records once for blob refs and caches the result as `media-index.json` in the snapshot (about 200ms to build, around 10ms from cache). Each entry has the CID, MIME type, file name, latest use, and every use: the record, role (JSON path), alt text, text and self-labels. See [archive-format.md](archive-format.md#media).
+- **Index:** `src/lib/media.ts` scans the archive's records once for blob refs and caches the result as `media-index.json` in the archive (about 200ms to build, around 10ms from cache). Each entry has the CID, MIME type, file name, latest use, and every use: the record, role (JSON path), alt text, text and self-labels. See [archive-format.md](archive-format.md#media).
 - **What's "downloaded":** whatever is in `archives/<handle>/blobs/` right now, checked per request. The Records tab uses the same check, so media downloaded after the archive (via the job or `slurp media`) shows locally there too. The `local` field on refs only reflects `--media` at archive time and isn't used for display.
-- **Download job:** `mode: 'media'` runs `downloadSnapshotMedia`, which downloads every file the snapshot references that isn't already on disk, 4 at a time, then updates `manifest.media`. Same as `slurp media <handle>` on the CLI.
+- **Download job:** `mode: 'media'` runs `downloadArchiveMedia`, which downloads every file the archive references that isn't already on disk, 4 at a time, then updates `manifest.media`. Same as `slurp media <handle>` on the CLI.
 - **Per page:** a doubling ladder around the default, `PER_PAGE_STEPS` in `src/lib/media-view.ts`. The choice rides in `?per=` so links are explicit, and the wall saves it in the `slurp-media-per` cookie so a later visit without `?per=` uses it. Changing the size keeps the first visible tile on the new page (`pageStart`).
 - **Nothing on the Media tab resets scroll:** the type tabs, source picker, per-page picker, pager (both copies) and newest/oldest toggle all keep your position, and so do the detail page's Prev/Next and ←/→. See [Scroll](#scroll).
 - **Detail navigation:** Prev/Next and ←/→ step through the current filter with `history: 'replace'`, so the wall stays one Back away. "All media" and Esc go back in history when you came from the wall, which restores its scroll. Otherwise they navigate to the page of the wall that contains the file.

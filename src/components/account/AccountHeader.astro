@@ -1,18 +1,16 @@
 ---
-import type { AccountSummary, Snapshot } from '../../lib/archives.ts';
-import { fmt, stamp, when } from '../../lib/format.ts';
+import type { Archive } from '../../lib/archives.ts';
+import { fmt } from '../../lib/format.ts';
 import Cell from '../ui/Cell.astro';
 import Ext from '../ui/Ext.astro';
 import Grid from '../ui/Grid.astro';
 
 interface Props {
-  snap: Snapshot;
-  account: AccountSummary;
-  tab: string;
+  archive: Archive;
 }
 
-const { snap, account, tab } = Astro.props;
-const { manifest: m, profile: p } = snap;
+const { archive } = Astro.props;
+const { manifest: m, profile: p } = archive;
 ---
 
 <Grid class="account-head">
@@ -30,32 +28,14 @@ const { manifest: m, profile: p } = snap;
       <p class="kicker">Records</p>
       <p class="big-number">{fmt(m.totalRecords)}</p>
     </div>
+    {m.deletedRecords > 0 && <p>+ {fmt(m.deletedRecords)} deleted, kept</p>}
     {p && <p>{fmt(p.followersCount)} followers · {fmt(p.followsCount)} following</p>}
-    <label class="field">
-      <span class="kicker">Snapshot</span>
-      <select class="input small snapshot-picker" aria-label="Snapshot" data-base={`/a/${snap.handle}`} data-tab={tab}>
-        {account.snapshots.map((s) => (
-          <option value={s.snapshot} selected={s.snapshot === snap.snapshot} title={`${when(s.fetchedAt)} · ${fmt(s.totalRecords)} records`}>
-            {stamp(s.fetchedAt)} · {fmt(s.totalRecords)}
-          </option>
-        ))}
-      </select>
-    </label>
     <div class="btn-row">
       <Ext href={m.profileUrl}>Bluesky ↗</Ext>
       <Ext href={`https://pdsls.dev/at://${m.did}`}>Repo ↗</Ext>
     </div>
   </Cell>
 </Grid>
-
-<script>
-  import { navigate } from 'astro:transitions/client';
-
-  document.addEventListener('change', (e) => {
-    const picker = (e.target as HTMLElement).closest<HTMLSelectElement>('.snapshot-picker');
-    if (picker) navigate(`${picker.dataset.base}/${picker.value}/${picker.dataset.tab}`);
-  });
-</script>
 
 <style>
   .account-head { grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr) minmax(0, 1.3fr); }

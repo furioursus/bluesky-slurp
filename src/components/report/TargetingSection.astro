@@ -15,7 +15,7 @@ const { window: W } = Astro.props;
 const t = W.targeting;
 ---
 
-<Section title="Targeting" sub={`${W.label}. “Not followed” is as of this snapshot.`}>
+<Section title="Targeting" sub={`${W.label}. “Not followed” is as of the last update.`}>
   <Grid cols="2">
     <Cell stack="sm"><h3 class="subtitle">Most replied to</h3><People people={t.mostRepliedTo} /></Cell>
     <Cell stack="sm"><h3 class="subtitle">Most quoted</h3><People people={t.mostQuoted} /></Cell>

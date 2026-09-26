@@ -4,8 +4,7 @@ import Base from '../../../layouts/Base.astro';
 import { listAccounts } from '../../../lib/archives.ts';
 
 const { handle } = Astro.params;
-const account = (await listAccounts()).find((a) => a.handle === handle);
-if (account) return Astro.redirect(`/a/${account.handle}/${account.snapshots[0].snapshot}/report`);
+if ((await listAccounts()).some((a) => a.handle === handle)) return Astro.redirect(`/a/${handle}/report`);
 Astro.response.status = 404;
 ---
 

@@ -1,32 +1,48 @@
 ---
 import AccountHeader from '../components/account/AccountHeader.astro';
+import UpdateArchive from '../components/jobs/UpdateArchive.astro';
 import EmptyState from '../components/ui/EmptyState.astro';
 import Tabs from '../components/ui/Tabs.astro';
-import { listAccounts, type Snapshot } from '../lib/archives.ts';
+import { listAccounts, type Archive } from '../lib/archives.ts';
+import { day, fmt, when } from '../lib/format.ts';
 import Base from './Base.astro';
 
 interface Props {
-  snap: Snapshot | null;
+  archive: Archive | null;
   tab: 'report' | 'records' | 'media' | 'identity';
 }
 
-const { snap, tab } = Astro.props;
-const account = snap && (await listAccounts()).find((a) => a.handle === snap.handle);
-if (!snap || !account) Astro.response.status = 404;
-const base = snap ? `/a/${snap.handle}/${snap.snapshot}` : '';
+const { archive, tab } = Astro.props;
+const { handle = '' } = Astro.params;
+const legacy = !archive && (await listAccounts()).find((a) => a.handle === handle && a.legacy);
+if (!archive && !legacy) Astro.response.status = 404;
+const m = archive?.manifest;
+const base = `/a/${handle}`;
 ---
 
-<Base title={snap?.manifest.handle ?? 'Not archived'} nav="accounts">
+<Base title={m?.handle ?? (legacy ? `@${handle}` : 'Not archived')} nav="accounts">
   {
-    snap && account ? (
+    archive && m ? (
       <>
-        <AccountHeader snap={snap} account={account} tab={tab} />
+        <AccountHeader archive={archive} />
+        <UpdateArchive handle={handle}>
+          <p>
+            Updated {when(m.fetchedAt)}
+            {m.firstArchivedAt && m.firstArchivedAt !== m.fetchedAt && <span class="muted"> · first archived {day(m.firstArchivedAt)}</span>}
+          </p>
+          <p class="muted">Pulls in anything new or edited. Records deleted since stay, flagged{m.deletedRecords ? ` (${fmt(m.deletedRecords)} so far)` : ''}.</p>
+        </UpdateArchive>
         <Tabs
           label="Account sections"
           items={(['report', 'records', 'media', 'identity'] as const).map((t) => ({ href: `${base}/${t}`, label: t, current: t === tab }))}
         />
         <slot />
       </>
+    ) : legacy ? (
+      <UpdateArchive handle={handle} label="Update and convert">
+        <h1 class="title case-normal">@{handle}</h1>
+        <p class="muted">This archive is still in the old one-folder-per-run format. One update folds every run into a single archive, flags anything deleted between them, and brings it up to date.</p>
+      </UpdateArchive>
     ) : (
       <EmptyState title="Not archived">
         <a class="btn solid" href="/">Archive it</a>

@@ -35,7 +35,7 @@ const counts: [string, number | null][] = [
 ];
 ---
 
-<Section title="Shape" sub={`${W.label}${W.since ? ` (since ${shortDate(W.since)})` : ''} · snapshot ${day(r.account.snapshot)} · first post ${day(r.account.firstPost)}`}>
+<Section title="Shape" sub={`${W.label}${W.since ? ` (since ${shortDate(W.since)})` : ''} · as of ${day(r.account.asOf)} · first post ${day(r.account.firstPost)}`}>
   <Grid cols="2">
     <Cell>
       <table class="data">

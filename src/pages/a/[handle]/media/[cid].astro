@@ -1,31 +1,31 @@
 ---
-import MediaViewer from '../../../../../components/media/MediaViewer.astro';
-import Cell from '../../../../../components/ui/Cell.astro';
-import EmptyState from '../../../../../components/ui/EmptyState.astro';
-import Ext from '../../../../../components/ui/Ext.astro';
-import Grid from '../../../../../components/ui/Grid.astro';
-import Section from '../../../../../components/ui/Section.astro';
-import SourceLinks from '../../../../../components/ui/SourceLinks.astro';
-import AccountLayout from '../../../../../layouts/AccountLayout.astro';
-import { loadSnapshot } from '../../../../../lib/archives.ts';
-import { fmt, plural, when } from '../../../../../lib/format.ts';
-import { loadMediaIndex, localBlobBytes, localBlobFiles } from '../../../../../lib/media.ts';
-import { filterMedia, isSensitive, mediaSearch, onDisk, pageStart, PER_PAGE_COOKIE, readMediaQuery, sourceLabel } from '../../../../../lib/media-view.ts';
-import { SENSITIVE } from '../../../../../lib/ui.ts';
+import MediaViewer from '../../../../components/media/MediaViewer.astro';
+import Cell from '../../../../components/ui/Cell.astro';
+import EmptyState from '../../../../components/ui/EmptyState.astro';
+import Ext from '../../../../components/ui/Ext.astro';
+import Grid from '../../../../components/ui/Grid.astro';
+import Section from '../../../../components/ui/Section.astro';
+import SourceLinks from '../../../../components/ui/SourceLinks.astro';
+import AccountLayout from '../../../../layouts/AccountLayout.astro';
+import { loadArchive } from '../../../../lib/archives.ts';
+import { fmt, plural, when } from '../../../../lib/format.ts';
+import { loadMediaIndex, localBlobBytes, localBlobFiles } from '../../../../lib/media.ts';
+import { filterMedia, isSensitive, mediaSearch, onDisk, pageStart, PER_PAGE_COOKIE, readMediaQuery, sourceLabel } from '../../../../lib/media-view.ts';
+import { SENSITIVE } from '../../../../lib/ui.ts';
 
 const KB = 1024;
 const MB = KB * 1024;
-const { handle = '', snapshot = '', cid = '' } = Astro.params;
-const snap = await loadSnapshot(handle, snapshot);
-const all = snap ? await loadMediaIndex(snap.dir) : [];
-const files = snap ? await localBlobFiles(snap.dir) : new Set<string>();
+const { handle = '', cid = '' } = Astro.params;
+const archive = await loadArchive(handle);
+const all = archive ? await loadMediaIndex(archive.dir) : [];
+const files = archive ? await localBlobFiles(archive.dir) : new Set<string>();
 const query = readMediaQuery(Astro.url, Astro.cookies.get(PER_PAGE_COOKIE)?.value);
 const shown = filterMedia(onDisk(all, files), query);
 const index = shown.findIndex((i) => i.cid === cid);
 const item = index >= 0 ? shown[index] : onDisk(all, files).find((i) => i.cid === cid);
-if (snap && !item) Astro.response.status = 404;
-const size = item && snap ? await localBlobBytes(snap.dir, [item.file]) : 0;
-const base = `/a/${handle}/${snapshot}/media`;
+if (archive && !item) Astro.response.status = 404;
+const size = item && archive ? await localBlobBytes(archive.dir, [item.file]) : 0;
+const base = `/a/${handle}/media`;
 const search = mediaSearch(query, { offset: 0 });
 const prev = index > 0 ? `${base}/${shown[index - 1].cid}${search}` : null;
 const next = index >= 0 && index < shown.length - 1 ? `${base}/${shown[index + 1].cid}${search}` : null;
@@ -35,7 +35,7 @@ const human = (n: number) => (n >= MB ? `${(n / MB).toFixed(1)} MB` : `${Math.ma
 const alts = item ? [...new Set(item.uses.map((u) => u.alt).filter(Boolean))] : [];
 ---
 
-<AccountLayout snap={snap} tab="media">
+<AccountLayout archive={archive} tab="media">
   {
     item ? (
       <>
@@ -75,10 +75,10 @@ const alts = item ? [...new Set(item.uses.map((u) => u.alt).filter(Boolean))] : 
               {item.uses.map((u) => (
                 <li>
                   <span class="who">
-                    <span class="mono muted">{sourceLabel(u.collection)}</span>
+                    <span class="mono muted">{sourceLabel(u.collection)}{u.deletedAt && <span class="tag">deleted</span>}</span>
                     {u.text && <span class="use-text">{u.text}</span>}
                   </span>
-                  <span class="count">{when(u.createdAt)} · <SourceLinks record={u} handle={snap?.manifest.handle ?? null} fromRecord={u.links ?? []} /></span>
+                  <span class="count">{when(u.createdAt)} · <SourceLinks record={u} handle={archive?.manifest.handle ?? null} fromRecord={u.links ?? []} /></span>
                 </li>
               ))}
             </ol>
@@ -86,7 +86,7 @@ const alts = item ? [...new Set(item.uses.map((u) => u.alt).filter(Boolean))] : 
         </Section>
       </>
     ) : (
-      <EmptyState title="Not on disk" body="This file isn’t downloaded, or this snapshot doesn’t reference it.">
+      <EmptyState title="Not on disk" body="This file isn’t downloaded, or this archive doesn’t reference it.">
         <a class="btn solid" href={base}>All media</a>
       </EmptyState>
     )
@@ -95,7 +95,7 @@ const alts = item ? [...new Set(item.uses.map((u) => u.alt).filter(Boolean))] : 
 
 <script>
   import { navigate } from 'astro:transitions/client';
-  import { keepScrollOnNextSwap } from '../../../../../lib/scroll.ts';
+  import { keepScrollOnNextSwap } from '../../../../lib/scroll.ts';
 
   const WALL_KEY = 'slurp-media-wall';
   const nav = () => document.querySelector<HTMLElement>('[data-media-nav]');

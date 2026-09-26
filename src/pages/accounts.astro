@@ -1,13 +1,17 @@
 ---
 import AccountGrid from '../components/account/AccountGrid.astro';
+import JobRunner from '../components/jobs/JobRunner.astro';
+import Check from '../components/ui/Check.astro';
 import Cell from '../components/ui/Cell.astro';
 import EmptyState from '../components/ui/EmptyState.astro';
 import Grid from '../components/ui/Grid.astro';
 import Base from '../layouts/Base.astro';
 import { listAccounts } from '../lib/archives.ts';
 import { plural } from '../lib/format.ts';
+import { activeJob } from '../lib/jobs.ts';
 
 const accounts = await listAccounts();
+const running = activeJob('update-all');
 ---
 
 <Base title="Accounts" nav="accounts">
@@ -17,6 +21,13 @@ const accounts = await listAccounts();
         <Cell stack="sm">
           <h1 class="display">Accounts</h1>
           <p class="muted">{plural(accounts.length, 'account')} archived</p>
+          <JobRunner mode="update-all" input="" after="reload" attach={running?.id}>
+            <form class="stack">
+              <Check name="media" title="Include media" note="Also download new images and video for every archive that has media on. Can take a while." />
+              <div class="btn-row"><button class="btn solid" type="submit">Update all</button></div>
+              <p class="muted text-xs">Records and reports for every account, one at a time.</p>
+            </form>
+          </JobRunner>
         </Cell>
         <Cell flush><AccountGrid accounts={accounts} /></Cell>
       </Grid>

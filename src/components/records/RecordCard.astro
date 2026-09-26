@@ -1,7 +1,7 @@
 ---
 import type { PostView } from '../../lib/appview.ts';
 import type { RecordLine } from '../../lib/archives.ts';
-import { when } from '../../lib/format.ts';
+import { day, when } from '../../lib/format.ts';
 import { EMBED_KICKER, embedTargets } from '../../lib/ui.ts';
 import { recordLinks } from '../../lib/sources.ts';
 import SourceLinks from '../ui/SourceLinks.astro';
@@ -28,7 +28,7 @@ const pointers = rec.refs.filter((x) => x.kind !== 'blob');
 
 <article class="record">
   <div class="head">
-    <span><strong>{when(rec.createdAt)}</strong> <span class="mono muted">{rec.rkey}</span></span>
+    <span><strong>{when(rec.createdAt)}</strong> <span class="mono muted">{rec.rkey}</span>{rec.deletedAt && <span class="tag solid" title={`Gone as of the update on ${day(rec.deletedAt)}`}>Deleted · last seen {day(rec.lastSeen)}</span>}</span>
     <SourceLinks record={rec} handle={accountHandle} fromRecord={recordLinks(rec.collection, r)} />
   </div>
   {text && <p class="text">{text}</p>}

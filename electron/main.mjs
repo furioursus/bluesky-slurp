@@ -72,6 +72,17 @@ async function startServer() {
   await waitForServer(`${origin}/`);
 }
 
+// see docs/desktop.md#updating-on-launch
+async function updateAllOnLaunch() {
+  try {
+    await fetch(`${origin}/api/jobs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin, cookie: `${TOKEN_COOKIE}=${TOKEN}` },
+      body: JSON.stringify({ mode: 'update-all', media: false }),
+    });
+  } catch {}
+}
+
 function stopServer() {
   server?.kill();
   server = null;
@@ -166,6 +177,7 @@ if (!app.requestSingleInstanceLock()) {
       return;
     }
     createWindow();
+    updateAllOnLaunch();
     app.on('activate', () => {
       if (!win) createWindow();
     });

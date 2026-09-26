@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { writeJson } from './archive.ts';
 import { getJson, xrpc } from './http.ts';
 import { webUrlForDid } from './refs.ts';
 
@@ -28,26 +29,23 @@ interface Post {
 
 const didOf = (uri: string) => uri.slice(5).split('/')[0];
 
-export async function resolveSnapshot(pathOrHandle: string, out: string): Promise<string> {
+export async function resolveArchive(pathOrHandle: string, out: string): Promise<string> {
   const candidates = [pathOrHandle, join(out, pathOrHandle.replace(/^@/, ''))];
   for (const c of candidates) {
     if (existsSync(join(c, 'manifest.json'))) return c;
-    const snaps = join(c, 'snapshots');
-    if (existsSync(snaps)) {
-      const latest = (await readdir(snaps)).sort().at(-1);
-      if (latest) return join(snaps, latest);
-    }
+    if (existsSync(join(c, 'snapshots'))) throw new Error(`${c} is in the old snapshot format. Update it once to convert: slurp ${pathOrHandle}`);
   }
   throw new Error(
-    `no snapshot found for ${pathOrHandle} (tried ${candidates.join(', ')}). Archive it first: slurp ${pathOrHandle} (add --analyze to archive and analyze in one go)`,
+    `no archive found for ${pathOrHandle} (tried ${candidates.join(', ')}). Archive it first: slurp ${pathOrHandle} (add --analyze to archive and analyze in one go)`,
   );
 }
 
-async function readCollection(snap: string, collection: string): Promise<Line[]> {
-  const file = join(snap, 'records', `${collection}.jsonl`);
+async function readCollection(dir: string, collection: string): Promise<Line[]> {
+  const file = join(dir, 'records', `${collection}.jsonl`);
   if (!existsSync(file)) return [];
   const text = await readFile(file, 'utf8');
-  return text.split('\n').filter(Boolean).map((l) => JSON.parse(l));
+  // see docs/analysis.md#live-records-only
+  return text.split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((l) => !l.deletedAt);
 }
 
 const ts = (l: Line) => (l.createdAt ? Date.parse(l.createdAt) : NaN);
@@ -106,14 +104,14 @@ export const WINDOWS = [
 ] as const;
 export type WindowKey = (typeof WINDOWS)[number]['key'];
 
-export async function analyze(snap: string) {
-  const manifest = JSON.parse(await readFile(join(snap, 'manifest.json'), 'utf8'));
+export async function analyze(dir: string) {
+  const manifest = JSON.parse(await readFile(join(dir, 'manifest.json'), 'utf8'));
   const self: string = manifest.did;
   const now = Date.parse(manifest.fetchedAt);
 
   const [postLines, likes, reposts, follows, blocks] = await Promise.all(
     ['app.bsky.feed.post', 'app.bsky.feed.like', 'app.bsky.feed.repost', 'app.bsky.graph.follow', 'app.bsky.graph.block'].map(
-      (c) => readCollection(snap, c),
+      (c) => readCollection(dir, c),
     ),
   );
   const posts = postLines.map((l) => classify(l, self));
@@ -260,7 +258,7 @@ export async function analyze(snap: string) {
     account: {
       did: self,
       handle: manifest.handle,
-      snapshot: manifest.fetchedAt,
+      asOf: manifest.fetchedAt as string,
       labels: manifest.selfLabels,
       firstPost: Number.isFinite(firstAt) ? new Date(firstAt).toISOString() : null,
     },
@@ -332,7 +330,7 @@ export function toMarkdown(r: Report): string {
 
 **TL;DR:** signals, not a verdict. The strongest bad-faith tells are structural: a high share of replies and quotes aimed at strangers, and bursts of replies at one account. Check the linked posts before you conclude anything. The web UI drills every section into 30 days / 3 months / 6 months / 1 year; this file shows all time plus the comparison below.
 
-- Snapshot ${r.account.snapshot.slice(0, 10)} · first post ${r.account.firstPost?.slice(0, 10) ?? 'n/a'} · self-labels: ${r.account.labels.join(', ') || 'none'}
+- As of ${r.account.asOf.slice(0, 10)} · first post ${r.account.firstPost?.slice(0, 10) ?? 'n/a'} · self-labels: ${r.account.labels.join(', ') || 'none'}
 
 ## Over time
 
@@ -340,7 +338,7 @@ export function toMarkdown(r: Report): string {
 |---|---|---|---|---|---|---|
 ${windows.map((w) => `| ${w.label} | ${w.shape.posts} | ${pc(w.shape.pctRepliesToOthers)} | ${pc(w.shape.pctQuotes)} | ${pc(w.shape.pctOutwardToStrangers)} | ${w.targeting.replyBurstsAtNonFollowed.length} | ${w.targeting.strangerQuotes.count} |`).join('\n')}
 
-**Reading it:** a cold share, burst count or stranger-quote rate that climbs as the window narrows means it's getting worse lately. Windows count back from the snapshot date. "Followed" and "cold" use relationships as of the snapshot.
+**Reading it:** a cold share, burst count or stranger-quote rate that climbs as the window narrows means it's getting worse lately. Windows count back from the last update. "Followed" and "cold" use relationships as of that update, and records deleted since are left out.
 
 ## Shape of engagement (all time)
 
@@ -389,9 +387,9 @@ ${list(all.interests.mostReposted, (p) => `${name(p)} — ${p.count}`)}
 }
 
 export async function runAnalyze(target: string, out: string) {
-  const snap = await resolveSnapshot(target, out);
-  const report = await analyze(snap);
-  await writeFile(join(snap, 'analysis.json'), `${JSON.stringify(report, null, 2)}\n`);
-  await writeFile(join(snap, 'analysis.md'), toMarkdown(report));
-  return snap;
+  const dir = await resolveArchive(target, out);
+  const report = await analyze(dir);
+  await writeJson(join(dir, 'analysis.json'), report);
+  await writeFile(join(dir, 'analysis.md'), toMarkdown(report));
+  return dir;
 }

@@ -5,18 +5,17 @@ import JobRunner from './JobRunner.astro';
 
 interface Props {
   handle: string;
-  snapshot: string;
 }
 
-const { handle, snapshot } = Astro.props;
+const { handle } = Astro.props;
 ---
 
-<JobRunner mode="analyze" input={handle} snapshot={snapshot} after="reload">
+<JobRunner mode="analyze" input={handle} after="reload">
   <form>
     <Grid cols="side">
       <Cell stack="sm">
         <h2 class="subtitle">Re-run</h2>
-        <p class="muted">Recomputes every window from this snapshot. Free, offline, about a second.</p>
+        <p class="muted">Recomputes every window from the archive as it stands. Free, offline, about a second.</p>
       </Cell>
       <Cell><div class="btn-row"><button class="btn solid" type="submit">Re-run analysis</button></div></Cell>
     </Grid>

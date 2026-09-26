@@ -21,11 +21,12 @@ Node ≥ 23.6 and `npm install`. The CLI runs straight from source with no build
 
 ```sh
 npm install
-npm run slurp -- furioursus.dev                   # records only (fast: ~30 MB / 65k records in ~4s)
+npm run slurp -- furioursus.dev                   # archive it, or update the archive you already have (~30 MB / 65k records in ~4s)
 npm run slurp -- furioursus.dev --media           # + images/video (can be GBs; ~8 files/s)
 npm run slurp -- furioursus.dev --analyze         # archive, then write the report
-npm run slurp -- analyze furioursus.dev           # report on the latest existing snapshot
-npm run slurp -- media furioursus.dev             # download media for the latest snapshot, later
+npm run slurp -- analyze furioursus.dev           # re-run the report on the existing archive
+npm run slurp -- media furioursus.dev             # download media for the archive, later
+npm run slurp -- migrate                          # check old snapshot-per-run archives; add --write to convert them
 ```
 
 Input can be a handle, `@handle`, a DID (`did:plc:…` / `did:web:…`), an `at://` URI, or a `bsky.app/profile/…` URL — whatever you've got handy. `--out <dir>` changes the archive root (default `./archives`).
@@ -42,7 +43,7 @@ Run `npm run dev`, then open http://127.0.0.1:4747. It's an Astro 7 app rendered
 | `npm run check` | `astro check`: types for `.astro` and `src/lib` |
 
 - **Local only:** it binds to `127.0.0.1` and rejects cross-origin POSTs, because it writes to disk and runs jobs. Don't put it on the open internet as-is.
-- **Screens:** New archive (form, then a live log), Accounts, and per account: Report / Records / Media / Identity. Pages are real URLs, e.g. `/a/<handle>/<snapshot>/report?w=30d`. Navigation swaps pages in place (Astro `ClientRouter`).
+- **Screens:** New archive (form, then a live log), Accounts, and per account: Report / Records / Media / Identity. Pages are real URLs, e.g. `/a/<handle>/report?w=30d`. Each account page has an **Update** button, and Accounts has **Update all**. Navigation swaps pages in place (Astro `ClientRouter`).
 - **Archive location:** `SLURP_ARCHIVES=/path npm run dev` points the UI at another archive root (default `./archives`).
 
 ### Desktop app
@@ -64,7 +65,7 @@ src/components/ui/Cell.astro:14
 src/components/ui/Grid.astro:10
 src/layouts/Base.astro:14
 src/layouts/AccountLayout.astro:17
-src/pages/a/[handle]/[snapshot]/records/[...collection].astro:35
+src/pages/a/[handle]/records/[...collection].astro:35
 ```
 
 - **Limits:** content injected with `set:html` has no line of its own (this project doesn't use it). Framework components without a `client:*` directive can't be named (this project has none).
@@ -73,19 +74,18 @@ src/pages/a/[handle]/[snapshot]/records/[...collection].astro:35
 
 ## What gets archived
 
-The whole signed repo from the account's own PDS, decoded to JSONL per collection, plus identity and the Bluesky AppView profile.
+The whole signed repo from the account's own PDS, decoded to JSONL per collection, plus identity and the Bluesky AppView profile. One living archive per person: run it again and it updates in place, keeping anything they've deleted since, flagged. Details in [docs/archive-format.md](docs/archive-format.md#updates).
 
 ```
 archives/<handle>/
-  blobs/<cid>.<ext>                 # --media only; shared across snapshots, never re-downloaded
-  snapshots/<timestamp>/
-    manifest.json                   # DID, handle + history, PDS, per-collection counts, media stats, flags
-    repo.car                        # raw, signature-verifiable repo export (com.atproto.sync.getRepo)
-    records/<collection>.jsonl      # one record per line, chronological within a collection
-    identity/did-document.json
-    identity/plc-audit-log.json     # did:plc only: full key/handle/PDS history
-    bsky-profile.json               # AppView view: follower counts, moderation labels (if on Bluesky)
-    analysis.md / analysis.json     # after `analyze`
+  manifest.json                     # DID, handle + history, PDS, live and deleted counts, update log, media stats, flags
+  repo.car                          # latest raw, signature-verifiable repo export (com.atproto.sync.getRepo)
+  records/<collection>.jsonl        # every record ever seen, chronological; firstSeen / lastSeen / deletedAt
+  identity/did-document.json
+  identity/plc-audit-log.json       # did:plc only: full key/handle/PDS history
+  bsky-profile.json                 # AppView view: follower counts, moderation labels (if on Bluesky)
+  analysis.md / analysis.json       # after `analyze`; refreshed by every update
+  blobs/<cid>.<ext>                 # --media only; never re-downloaded
 ```
 
 - **Every surface = every lexicon in the repo.** Bluesky posts, likes, reposts, follows, blocks, lists, and also Tangled, teal.fm, Rocksky, Popfeed, Leaflet/standard.site, and so on.
@@ -119,7 +119,7 @@ Each JSONL line has `uri` + `web` for the record itself and a `refs` array for e
 
 Structural signals of good- or bad-faith engagement, plus interests. It's offline except for one batched handle lookup. Read the linked posts before you conclude anything about anyone.
 
-- **Time windows:** every stat is computed for the last 30 days, 3 months, 6 months, 1 year, and all time, counted back from the snapshot date. The web UI switches between them instantly. `analysis.md` shows all time plus an "Over time" comparison table.
+- **Time windows:** every stat is computed for the last 30 days, 3 months, 6 months, 1 year, and all time, counted back from the last update. The web UI switches between them instantly. `analysis.md` shows all time plus an "Over time" comparison table.
 - **Shape:** original vs self-thread vs reply vs quote, likes per post, cadence.
 - **Cold outreach:** share of replies/quotes aimed at accounts they don't follow, and at accounts they've never liked either. This is the reply-guy and dunk signal.
 - **Fixation:** bursts of 5+ replies to one non-followed account within 24h, with links.
@@ -127,7 +127,7 @@ Structural signals of good- or bad-faith engagement, plus interests. It's offlin
 - **Interests:** hashtags, link domains, languages, most-liked/most-reposted accounts, which atmosphere apps they use.
 
 Caveats:
-- "Followed" means followed *at snapshot time*, in every window. Old replies to people they've since unfollowed count as cold.
+- "Followed" means followed *as of the last update*, in every window, and records they've deleted since are left out of the report. Old replies to people they've since unfollowed count as cold.
 - Many blocks usually means block lists or self-defense, not aggression.
 - It never reads text, only structure.
 

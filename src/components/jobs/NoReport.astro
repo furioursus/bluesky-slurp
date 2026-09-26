@@ -5,13 +5,12 @@ import JobRunner from './JobRunner.astro';
 
 interface Props {
   handle: string;
-  snapshot: string;
 }
 
-const { handle, snapshot } = Astro.props;
+const { handle } = Astro.props;
 ---
 
-<JobRunner mode="analyze" input={handle} snapshot={snapshot} after="reload">
+<JobRunner mode="analyze" input={handle} after="reload">
   <form>
     <Grid cols="side">
       <Cell empty>

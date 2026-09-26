@@ -11,7 +11,7 @@ No single score. Every number links to its evidence, and you decide.
 
 ## Cold outreach
 
-A reply or quote is "cold" when it's aimed at an account they don't follow *and* have never liked a post from. Both checks use the relationships as of the snapshot.
+A reply or quote is "cold" when it's aimed at an account they don't follow *and* have never liked a post from. Both checks use the relationships as of the last update.
 
 - "Non-followed" alone is too broad: people reply to accounts they read through feeds and search. Adding "never liked them either" isolates genuine strangers.
 - The archive only knows the *current* follow list. A reply to someone they followed back then but have since unfollowed counts as cold. There's no fixing this without historical follow data, so don't try to back-date it.
@@ -23,13 +23,20 @@ A burst is 5+ replies to the same non-followed account within any 24-hour stretc
 
 ## Time windows
 
-Every stat is computed for the last 30 days, 3 months, 6 months, 1 year, and all time, counted back from the snapshot's `fetchedAt`, not today.
+Every stat is computed for the last 30 days, 3 months, 6 months, 1 year, and all time, counted back from the archive's last update (`fetchedAt`), not today.
 
-- Counting from the snapshot keeps old snapshots stable: a March archive always means "the 30 days before March".
+- Counting from the last update keeps a report stable until you update again: an archive last updated in March always means "the 30 days before March".
 - All five windows are computed in one pass and stored in `analysis.json` under `byWindow`. The UI switches instantly with no recomputation.
 - Likes, reposts, follows and blocks are windowed by their own `createdAt`.
 - "Apps on the atmosphere" is all-time only: it comes from per-collection counts in the manifest, which carry no timestamps.
 - Reports without `byWindow` (pre-v2) get a one-click re-run prompt in the UI.
+
+## Live records only
+
+The report reads only records that still exist. Anything flagged deleted is left out.
+
+- Deleted follows and blocks are unfollows and unblocks, so counting them would put people back in the follow list who aren't there anymore, and turn warm replies cold or cold replies warm.
+- Keeping one rule for everything (posts, likes, reposts too) means the report always describes the account as it stands at the last update. The deleted records are still in the archive, one filter away on the Records tab.
 
 ## Empty samples
 
