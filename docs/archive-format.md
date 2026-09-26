@@ -4,11 +4,12 @@
 
 ## Layout
 
-**TL;DR:** `archives/<handle>/snapshots/<UTC timestamp>/`, plus `archives/<handle>/blobs/` when media is downloaded.
+**TL;DR:** `archives/<handle>/snapshots/<UTC timestamp>/`, plus `archives/<handle>/blobs/` when media is downloaded and `thumbs/` once the web UI has shown it.
 
 ```
 archives/<handle>/
   blobs/<cid>.<ext>
+  thumbs/<cid>.<ext>.webp            # web UI tile cache, safe to delete (see web-ui.md#thumbnails)
   snapshots/<timestamp>/
     manifest.json
     repo.car

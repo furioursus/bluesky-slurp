@@ -204,9 +204,32 @@ table.data .wide { width: var(--col-wide); }
 .thumbs img, .thumbs video { height: var(--thumb); min-width: var(--thumb-min); max-width: 100%; object-fit: cover; filter: grayscale(1); border: var(--line) solid var(--ink); background: var(--faint); }
 .thumbs img:hover, .thumbs video:hover { filter: none; }
 
-.blurred { position: relative; overflow: hidden; display: inline-block; cursor: pointer; }
-.blurred img, .blurred video { filter: blur(var(--blur)) grayscale(1); min-width: var(--thumb-wide); }
-.blurred::after { content: 'Sensitive · click to show'; position: absolute; inset: auto var(--space-xs) var(--space-xs); background: var(--ink); color: var(--paper); font-size: var(--text-2xs); padding: var(--space-3xs) var(--space-xs); text-align: center; }
+/* see docs/web-ui.md#sensitive-media */
+:where(:root:not([data-blur='off'])) .blurred { position: relative; overflow: hidden; display: inline-block; cursor: pointer; }
+:where(:root:not([data-blur='off'])) .blurred img, :where(:root:not([data-blur='off'])) .blurred video { filter: blur(var(--blur)) grayscale(1); min-width: var(--thumb-wide); }
+:where(:root:not([data-blur='off'])) .blurred::after { content: 'Sensitive · click to show'; position: absolute; inset: auto var(--space-xs) var(--space-xs); background: var(--ink); color: var(--paper); font-size: var(--text-2xs); padding: var(--space-3xs) var(--space-xs); text-align: center; }
+
+.corner-toggle {
+  position: fixed;
+  bottom: 0;
+  z-index: 10;
+  width: var(--toggle-w);
+  height: var(--toggle-h);
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-2xs);
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  border: var(--line) solid var(--ink);
+  border-left: 0;
+  border-bottom: 0;
+  font: 300 var(--text-xs) var(--font);
+  cursor: pointer;
+}
+.corner-toggle .dot { width: var(--box); height: var(--box); border: var(--line) solid var(--ink); display: grid; place-content: center; }
+.corner-toggle .dot::after { content: ''; width: var(--box-mark); height: var(--box-mark); background: var(--ink); }
 
 .empty { min-height: var(--empty); display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: var(--space-lg); }
 .notice { border: var(--line) solid var(--ink); padding: var(--space-sm) var(--space-md); }

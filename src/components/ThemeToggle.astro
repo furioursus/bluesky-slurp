@@ -1,4 +1,4 @@
-<button class="theme-toggle" type="button" aria-label="Toggle day and night mode" transition:persist="theme-toggle">
+<button class="corner-toggle theme-toggle" type="button" aria-label="Toggle day and night mode" transition:persist="theme-toggle">
   <span class="label">day</span>
   <span class="dot" aria-hidden="true"></span>
 </button>
@@ -21,26 +21,6 @@
 </script>
 
 <style>
-  .theme-toggle {
-    position: fixed;
-    left: 0;
-    bottom: 0;
-    z-index: 10;
-    width: var(--toggle-w);
-    height: var(--toggle-h);
-    display: grid;
-    place-content: center;
-    justify-items: center;
-    gap: var(--space-2xs);
-    padding: 0;
-    background: var(--paper);
-    color: var(--ink);
-    border: var(--line) solid var(--ink);
-    border-left: 0;
-    border-bottom: 0;
-    font: 300 var(--text-xs) var(--font);
-    cursor: pointer;
-  }
-  .dot { width: var(--box); height: var(--box); border: var(--line) solid var(--ink); display: grid; place-content: center; }
-  .dot::after { content: ''; width: var(--box-mark); height: var(--box-mark); border-radius: 50%; background: var(--ink); }
+  .theme-toggle { left: 0; }
+  .dot::after { border-radius: 50%; }
 </style>

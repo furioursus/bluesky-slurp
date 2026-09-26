@@ -1,0 +1,27 @@
+<button class="corner-toggle blur-toggle" type="button" aria-label="Blur sensitive media" aria-pressed="true" transition:persist="blur-toggle">
+  <span class="label">blur</span>
+  <span class="dot" aria-hidden="true"></span>
+</button>
+
+<script>
+  import { BLUR_KEY, blurOn } from '../lib/blur.ts';
+
+  const toggle = document.querySelector<HTMLButtonElement>('.blur-toggle')!;
+  const root = document.documentElement;
+  const sync = () => toggle.setAttribute('aria-pressed', String(blurOn()));
+  document.addEventListener('astro:before-swap', (e) => {
+    if (root.dataset.blur) e.newDocument.documentElement.dataset.blur = root.dataset.blur;
+  });
+  toggle.addEventListener('click', () => {
+    if (blurOn()) root.dataset.blur = 'off';
+    else delete root.dataset.blur;
+    try { localStorage.setItem(BLUR_KEY, blurOn() ? 'on' : 'off'); } catch {}
+    sync();
+  });
+  sync();
+</script>
+
+<style>
+  .blur-toggle { left: var(--toggle-w); }
+  .blur-toggle[aria-pressed='false'] .dot::after { transform: scale(0); }
+</style>

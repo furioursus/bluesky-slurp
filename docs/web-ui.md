@@ -1,6 +1,6 @@
 # Web UI
 
-**TL;DR:** an Astro 7 app rendered on the server by the Node adapter (`npm run dev`, `npm run serve`). Pages read archives straight from disk and arrive fully rendered. Astro's `ClientRouter` swaps pages in place, so navigation feels like an SPA with no reloads, while every page is still server-rendered HTML. The browser runs a little JavaScript for the router, the job panel, the theme toggle, the thread-roots toggle, scroll keeping and click-to-reveal on sensitive media. It's local-only on purpose, and it never renders archived text as HTML.
+**TL;DR:** an Astro 7 app rendered on the server by the Node adapter (`npm run dev`, `npm run serve`). Pages read archives straight from disk and arrive fully rendered. Astro's `ClientRouter` swaps pages in place, so navigation feels like an SPA with no reloads, while every page is still server-rendered HTML. The browser runs a little JavaScript for the router, the job panel, the theme and blur toggles, the thread-roots toggle, scroll keeping and click-to-reveal on sensitive media. It's local-only on purpose, and it never renders archived text as HTML.
 
 ## Structure
 
@@ -8,9 +8,9 @@
 
 ```
 src/
-  lib/            engine (archive, analyze, refs, identity, http, media, cli) + UI helpers (archives, jobs, appview, format, ui, scroll, media-view)
+  lib/            engine (archive, analyze, refs, identity, http, media, cli) + UI helpers (archives, jobs, appview, format, ui, scroll, media-view, serve, thumbs, blur)
   middleware.ts   same-origin check for non-GET requests
-  layouts/        Base (html shell, ClientRouter, masthead, theme toggle, scroll keeper) · AccountLayout (header + tabs, 404 when not archived)
+  layouts/        Base (html shell, ClientRouter, masthead, theme and blur toggles, scroll keeper) · AccountLayout (header + tabs, 404 when not archived)
   components/
     ui/           Grid · Cell · Section · Stat · Tabs · Check · Ext · People · Chips · EmptyState
     jobs/         JobRunner (the only real island) · ArchiveForm · AnalysisActions · NoReport · UpgradeReport
@@ -19,7 +19,7 @@ src/
     media/        MediaWall · MediaFilters · MediaDownload · MediaViewer
     account/      AccountHeader · AccountGrid
   pages/          / · /accounts · /about · /a/[handle] · /a/[handle]/[snapshot]/{report,records/[...collection],media,media/[cid],identity}
-                  /blobs/[handle]/[file] · /api/jobs · /api/jobs/[id]/events
+                  /blobs/[handle]/[file] · /thumbs/[handle]/[file] · /api/jobs · /api/jobs/[id]/events
   styles/         global.css (tokens + primitives) · media.css (the one breakpoint)
 ```
 
@@ -32,7 +32,7 @@ src/
 
 - **Bind address:** `127.0.0.1`, never `0.0.0.0`. Exposing it remotely needs real auth in front (see the parked Cloudflare Access plan in project memory), not a flag flip.
 - **Origin check:** `src/middleware.ts` returns 403 for any non-GET request whose `Origin` host doesn't match the request host. This stops a malicious page from POSTing jobs here. It skips prerendered routes, which can't receive POSTs. Behind a tunnel this still holds, because it compares hosts rather than full origins.
-- **Paths:** handle, snapshot, collection and blob names must match `^[A-Za-z0-9._:-]+$` and resolve inside the archive root (`SAFE_NAME` in `src/lib/archives.ts`).
+- **Paths:** handle, snapshot, collection and blob names must match `^[A-Za-z0-9._:-]+$` and resolve inside the archive root (`SAFE_NAME` in `src/lib/archives.ts`). Blob and thumbnail paths also go through `accountPath` in `src/lib/serve.ts`, which rejects any name that resolves outside `archives/<handle>/blobs/` or `thumbs/` (a handle of `..` matches the allowlist).
 
 ## Rendering untrusted text
 
@@ -62,7 +62,7 @@ src/
 - `null` renders as "Post unavailable": deleted, taken down, or hidden from logged-out viewers. The pointer still records which post it was.
 - `undefined` renders as "Couldn't load this post" with a link to bsky.app. A network failure must never be presented as a deletion.
 - Pointer labels resolve DIDs to `@handles` server-side too (`getHandles`, same cache).
-- Images on posts or authors labelled `porn`, `sexual`, `nudity`, `graphic-media` or `gore` are blurred until clicked.
+- Images on posts or authors labelled `porn`, `sexual`, `nudity`, `graphic-media` or `gore` are blurred until clicked, unless blur is off. See [Sensitive media](#sensitive-media).
 - Media not on disk loads from the account's PDS (the user's choice).
 
 ## Design
@@ -74,7 +74,7 @@ src/
 - **Scales:** spacing `--space-3xs` to `--space-xl` (2px to 32px), type `--text-2xs` to `--text-lg` plus four fluid display sizes, tracking `--track` / `--track-wide`, and `--control` (2.75rem) as the minimum tap target.
 - **Scoped styles:** a component's `<style>` is scoped to its own template. `Grid` and `Cell` spread their props onto their root element, so a parent's scope attribute reaches them and `class` passed from a parent stays styleable. Use `:global()` only for classes applied through `Ext` (`blurred`, `link-card-link`).
 - **One line, never two:** a grid nested inside a cell drops its own bottom border (`.cell .grid`), since the outer grid already draws that edge. Nested content that needs lines should be full-bleed cells in the same grid, not a grid floating inside padding. A 2-column grid with an odd number of cells stretches the last one across the row, so the ink background never shows through as a black block.
-- **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference. `body` has bottom padding so the last row can always scroll clear of it, after it was found covering the Proceed button.
+- **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference, with the blur toggle beside it (same `.corner-toggle` box, sharing one line). `body` has bottom padding so the last row can always scroll clear of it, after it was found covering the Proceed button.
 - **Theme before paint:** an inline script in `Base.astro` applies the saved theme before first paint so night mode doesn't flash white. On router swaps the router copies the new page's `<html>` attributes, which would drop `data-theme`, so `ThemeToggle` writes the current theme onto the incoming document in `astro:before-swap`. The toggle itself is `transition:persist`.
 - **Scroll:** see [Scroll](#scroll).
 - **Stale component modules in dev:** after editing an `.astro` file, Astro 7's dev server has twice served the old compiled `<style>` or `<script>` for that component (fetched with `cache: no-store`), while the file watcher reported the change and the markup updated. If an edit seems to do nothing, restart `npm run dev` before debugging the code. A production build never has this problem.
@@ -89,9 +89,32 @@ src/
 - **Per page:** a doubling ladder around the default, `PER_PAGE_STEPS` in `src/lib/media-view.ts`. The choice rides in `?per=` so links are explicit, and the wall saves it in the `slurp-media-per` cookie so a later visit without `?per=` uses it. Changing the size keeps the first visible tile on the new page (`pageStart`).
 - **Nothing on the Media tab resets scroll:** the type tabs, source picker, per-page picker, pager (both copies) and newest/oldest toggle all keep your position, and so do the detail page's Prev/Next and ←/→. See [Scroll](#scroll).
 - **Detail navigation:** Prev/Next and ←/→ step through the current filter with `history: 'replace'`, so the wall stays one Back away. "All media" and Esc go back in history when you came from the wall, which restores its scroll. Otherwise they navigate to the page of the wall that contains the file.
-- **Sensitive media:** files whose records self-label `porn`, `sexual`, `nudity`, `graphic-media` or `gore` are blurred on the wall and in the viewer until clicked (`SensitiveReveal`, shared with embeds).
+- **Sensitive media:** blurred on the wall and in the viewer until clicked, unless blur is off. See [Sensitive media](#sensitive-media).
+- **Tiles are thumbnails:** the wall and the Records tab load `/thumbs/`, never the originals. See [Thumbnails](#thumbnails).
 - **Empty filters:** the current type tab always shows, even at 0, and an empty result says what matched nothing, with links to widen it. The wall isn't rendered when there are no tiles, which avoids a doubled rule.
 - **Tiles:** `repeat(auto-fill, minmax(--tile, 1fr))` with per-tile right and bottom borders, clipped by the wall's `overflow: hidden`, so a partial last row doesn't leave ink blocks the way the `gap` hairline trick would.
+
+## Thumbnails
+
+**TL;DR:** tiles load a 640px WebP from `/thumbs/<handle>/<file>` (about 40 KB) instead of the original (median 574 KB, up to 8 MB). Videos get a still poster frame instead of a `<video>` element. On one large archive this took a 60-tile page from 77 MB and 15–30 s of blank tiles to 2.4 MB, fully drawn in 1.6 s from cold.
+
+- **Why videos matter most:** a `<video preload="metadata">` tile holds its HTTP/1.1 connection open for 15–30 s. The browser allows 6 connections per host, so a page with 6+ video tiles made every image behind them wait in the queue and show blank. Measured: 11 video tiles, every image request queued for 15.2 s, server time 2 ms.
+- **What gets made:** `src/lib/thumbs.ts`. JPEG, PNG, WebP and AVIF go through `sharp` (auto-rotated from EXIF, shortest side 640px, never enlarged). MP4, MOV and WebM have the frame at 0.1 s pulled by `ffmpeg`, then the same resize.
+- **Cache:** made on first request into `archives/<handle>/thumbs/<file>.webp` and reused after (see [archive-format.md](archive-format.md#layout)). Concurrent requests for one file share a single render. Delete the folder to rebuild them. Roughly 40 KB per file, so about 80 MB for a 2,000-file archive viewed in full.
+- **Fallbacks:** a GIF, HEIC or anything else `sharp` can't read redirects to the original. A video with no poster (no `ffmpeg` on `PATH`, or a broken file) returns 404, and the tile shows just its ▶ badge.
+- **Caching headers:** blobs and thumbnails are named by CID, so both are served `private, max-age=31536000, immutable`.
+- **Records tab:** local images use the thumbnail and link to the original. Local videos keep their player, with the poster and `preload="none"`, so nothing downloads until you press play.
+- **Needs:** `sharp` (a direct dependency) and `ffmpeg` on `PATH` for video posters.
+
+## Sensitive media
+
+**TL;DR:** media whose records self-label `porn`, `sexual`, `nudity`, `graphic-media` or `gore` renders with the `blurred` class. The **blur** toggle next to day/night turns the blur off everywhere. It's remembered per browser, and it's on by default.
+
+- **Where it applies:** the media wall, the media viewer, and embed images in Records (`MediaWall`, `MediaViewer`, `EmbedMedia`, `PostEmbed`).
+- **Click to reveal:** with blur on, clicking a blurred item removes its blur instead of following the link (`SensitiveReveal`). With blur off, clicks go straight through.
+- **How it's switched:** `BlurToggle` sets `data-blur="off"` on `<html>` and saves `slurp-blur` in `localStorage`. The blur rules only match `:root:not([data-blur='off'])`, so switching needs no server round trip or navigation and never moves the scroll. The global rules are wrapped in `:where()` so they keep the low specificity that lets components like `.tile` override `display` and `min-width`.
+- **Before paint and across swaps:** the same inline script that applies the theme applies `data-blur` before first paint, and `BlurToggle` copies it onto the incoming document in `astro:before-swap`, just like the theme. The server never sees the setting.
+- **In practice:** on one archive, 48% of files were self-labelled, and every tile is grayscale until hovered, so with blur on about half the wall reads as flat grey squares with a "Sensitive · click to show" tag.
 
 ## Source links
 

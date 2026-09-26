@@ -1,7 +1,9 @@
 <script>
+  import { blurOn } from '../../lib/blur.ts';
+
   document.addEventListener('click', (e) => {
     const hit = (e.target as HTMLElement).closest('.blurred');
-    if (!hit) return;
+    if (!hit || !blurOn()) return;
     e.preventDefault();
     hit.classList.remove('blurred');
   });

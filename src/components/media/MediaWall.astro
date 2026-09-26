@@ -11,7 +11,7 @@ interface Props {
 }
 
 const { handle, items, href } = Astro.props;
-const src = (i: MediaItem) => `/blobs/${handle}/${i.file}`;
+const thumb = (i: MediaItem) => `/thumbs/${handle}/${i.file}`;
 ---
 
 <div class="wall">
@@ -19,8 +19,7 @@ const src = (i: MediaItem) => `/blobs/${handle}/${i.file}`;
     {
       items.map((i) => (
         <a class:list={['tile', { blurred: isSensitive(i, SENSITIVE) }]} href={href(i)} title={[i.at?.slice(0, 10), i.uses[0]?.alt].filter(Boolean).join(' · ')}>
-          {i.kind === 'image' && <img src={src(i)} alt={i.uses.find((u) => u.alt)?.alt ?? ''} loading="lazy" />}
-          {i.kind === 'video' && <video src={`${src(i)}#t=0.1`} muted playsinline preload="metadata" />}
+          {i.kind !== 'other' && <img src={thumb(i)} alt={i.uses.find((u) => u.alt)?.alt ?? ''} loading="lazy" decoding="async" />}
           {i.kind === 'other' && <span class="mime">{i.mimeType ?? 'file'}</span>}
           {i.kind === 'video' && <b class="badge">▶</b>}
         </a>
@@ -32,8 +31,11 @@ const src = (i: MediaItem) => `/blobs/${handle}/${i.file}`;
 <SensitiveReveal />
 
 <script>
+  import { blurOn } from '../../lib/blur.ts';
+
   document.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement).closest('.tile:not(.blurred)')) sessionStorage.setItem('slurp-media-wall', location.pathname + location.search);
+    const tile = (e.target as HTMLElement).closest('.tile');
+    if (tile && !(tile.classList.contains('blurred') && blurOn())) sessionStorage.setItem('slurp-media-wall', location.pathname + location.search);
   });
 </script>
 
@@ -57,9 +59,9 @@ const src = (i: MediaItem) => `/blobs/${handle}/${i.file}`;
     overflow: hidden;
     text-decoration: none;
   }
-  .tile img, .tile video { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1); min-width: 0; }
-  .tile:hover img, .tile:hover video, .tile:focus-visible img { filter: none; }
-  .tile.blurred img, .tile.blurred video { filter: blur(var(--blur)) grayscale(1); }
+  .tile img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1); min-width: 0; }
+  .tile:hover img, .tile:focus-visible img { filter: none; }
+  :global(:root:not([data-blur='off'])) .tile.blurred img { filter: blur(var(--blur)) grayscale(1); }
   .badge { position: absolute; left: var(--space-xs); bottom: var(--space-xs); background: var(--ink); color: var(--paper); padding: var(--space-3xs) var(--space-xs); font-weight: 400; font-size: var(--text-xs); }
   .mime { font-family: var(--mono); font-size: var(--text-xs); color: var(--muted); padding: var(--space-sm); overflow-wrap: anywhere; text-align: center; }
 </style>

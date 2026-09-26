@@ -14,7 +14,7 @@
 
 ## Usage
 
-**TL;DR:** Node ≥ 23.6, `npm install`. The CLI runs directly with no build (`npm run slurp -- <args>`). The web UI is Astro: `npm run dev`.
+**TL;DR:** Node ≥ 23.6, `npm install`. The CLI runs directly with no build (`npm run slurp -- <args>`). The web UI is Astro: `npm run dev`. Video poster frames in the media wall need `ffmpeg` on `PATH` (`brew install ffmpeg`); without it, video tiles show just a ▶ badge.
 
 ```sh
 npm install
