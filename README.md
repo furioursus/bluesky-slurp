@@ -1,5 +1,7 @@
 # bluesky-profile-slurper
 
+[![Node ≥ 23.6](https://img.shields.io/badge/node-%E2%89%A5%2023.6-000?style=flat-square&logo=nodedotjs)](package.json) [![Astro](https://img.shields.io/github/package-json/dependency-version/furioursus/bluesky-slurp/astro?style=flat-square&color=000&logo=astro)](https://astro.build) [![atproto](https://img.shields.io/badge/atproto-archiver-000?style=flat-square&logo=bluesky)](https://atproto.com)
+
 **TL;DR:** `slurp <handle>` archives everything an atproto account has publicly put on the network, from every app, not just Bluesky. Every interaction carries a clickable pointer to what it targets. Media is opt-in (`--media`). `slurp analyze <handle>` turns an archive into a behavior and interests report built from signals and evidence links. It never gives a verdict.
 
 ## Docs
