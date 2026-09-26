@@ -4,3 +4,4 @@ archives/
 .claude/settings.local.json
 dist/
 .astro/
+release/

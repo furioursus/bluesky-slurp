@@ -13,6 +13,7 @@ The "why" lives here, not in the code. The only comments are one-line links back
 | [docs/archive-format.md](docs/archive-format.md) | directory layout, record JSON, record order, the `refs` pointer format |
 | [docs/analysis.md](docs/analysis.md) | signals vs verdicts, cold outreach, reply bursts, time windows, empty samples |
 | [docs/web-ui.md](docs/web-ui.md) | local-only security, rendering untrusted text, the API, embeds, design decisions |
+| [docs/desktop.md](docs/desktop.md) | the macOS app: how it runs, the archive folder, the per-launch token, signing and size |
 
 ## Usage
 
@@ -43,6 +44,14 @@ Run `npm run dev`, then open http://127.0.0.1:4747. It's an Astro 7 app rendered
 - **Local only:** it binds to `127.0.0.1` and rejects cross-origin POSTs, because it writes to disk and runs jobs. Don't put it on the open internet as-is.
 - **Screens:** New archive (form, then a live log), Accounts, and per account: Report / Records / Media / Identity. Pages are real URLs, e.g. `/a/<handle>/<snapshot>/report?w=30d`. Navigation swaps pages in place (Astro `ClientRouter`).
 - **Archive location:** `SLURP_ARCHIVES=/path npm run dev` points the UI at another archive root (default `./archives`).
+
+### Desktop app
+
+There's a macOS app too. `npm run app:dist` builds `release/Slurp-<version>-arm64.dmg`; drag Slurp into Applications and it runs the same server in its own window, no terminal needed. `npm run app` opens a dev copy without packaging. Details in [docs/desktop.md](docs/desktop.md).
+
+- **Archives** live in `~/Library/Application Support/Slurp/archives` unless you pick another folder (File → Choose Archive Folder…).
+- **Locked to its own window:** every launch makes a random token, and the server refuses requests without it.
+- **Windows and Linux:** later.
 
 ### Component inspector (astro-pathfinder)
 

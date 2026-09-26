@@ -25,6 +25,7 @@ src/
 
 - The CLI still runs with plain Node (`node src/lib/cli.ts`), with no Astro involved. `src/lib/*` keeps `.ts` import extensions and erasable-only TypeScript for that reason.
 - `@astrojs/check` pins TypeScript to 5–6, so the project uses TypeScript 6.
+- The macOS app wrapper lives in `electron/` and runs this same built server. See [desktop.md](desktop.md).
 
 ## Security
 
@@ -33,6 +34,7 @@ It binds to `127.0.0.1` (Astro `server.host`, plus `HOST` in `npm run serve`), m
 - **Bind address:** `127.0.0.1`, never `0.0.0.0`. Exposing it remotely needs real auth in front of it, not a flag flip.
 - **Origin check:** `src/middleware.ts` returns 403 for any non-GET request whose `Origin` host doesn't match the request host. This stops a malicious page from POSTing jobs here. It skips prerendered routes, which can't receive POSTs. Behind a tunnel this still holds, because it compares hosts rather than full origins.
 - **Paths:** handle, snapshot, collection and blob names must match `^[A-Za-z0-9._:-]+$` and resolve inside the archive root (`SAFE_NAME` in `src/lib/archives.ts`). Blob and thumbnail paths also go through `accountPath` in `src/lib/serve.ts`, which rejects any name that resolves outside `archives/<handle>/blobs/` or `thumbs/` (a handle of `..` matches the allowlist).
+- **App token:** when `SLURP_TOKEN` is set, which the desktop app does with a fresh random value every launch, middleware returns 403 for any request without a matching `slurp-token` cookie. Prerendered pages and static files skip it, since they carry no archive data. See [desktop.md](desktop.md#per-launch-token).
 
 ## Rendering untrusted text
 

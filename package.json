@@ -1,5 +1,6 @@
 {
   "name": "bluesky-slurp",
+  "productName": "Slurp",
   "version": "0.1.0",
   "description": "Archive an atproto account's public activity",
   "license": "MIT",
@@ -10,7 +11,9 @@
     "dev": "node --env-file-if-exists=.env node_modules/astro/bin/astro.mjs dev",
     "dev:inspect": "INSPECT=1 node --env-file-if-exists=.env node_modules/astro/bin/astro.mjs dev",
     "build": "astro build",
-    "check": "astro check"
+    "check": "astro check",
+    "app": "astro build && electron .",
+    "app:dist": "astro build && electron-builder --mac"
   },
   "type": "module",
   "dependencies": {
@@ -30,7 +33,36 @@
     "@csstools/postcss-global-data": "^4.0.0",
     "@types/node": "^26.6.2",
     "astro-pathfinder": "https://github.com/furioursus/astro-pathfinder/archive/refs/tags/v1.0.0.tar.gz",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "postcss-custom-media": "^12.0.2",
     "typescript": "^6.0.3"
+  },
+  "main": "electron/main.mjs",
+  "build": {
+    "appId": "dev.furioursus.slurp",
+    "productName": "Slurp",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "package.json"
+    ],
+    "asar": false,
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.png"
+    }
   }
 }
