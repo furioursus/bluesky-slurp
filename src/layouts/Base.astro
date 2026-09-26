@@ -23,6 +23,7 @@ const { title, nav } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title ? `${title} · Slurp` : 'Slurp'}</title>
     <meta name="description" content="Archive and read an atproto account's public activity." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <script is:inline define:vars={{ fonts: FONT_STACKS, fontKey: FONT_KEY, wordmark: WORDMARK }}>
       const root = document.documentElement;
       let font = null;

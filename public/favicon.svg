@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .tile { fill: #000; }
+    .s { fill: #fff; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #fff; }
+      .s { fill: #000; }
+    }
+  </style>
+  <rect class="tile" width="32" height="32" />
+  <path class="s" d="M7 6h18v4H7zM21 6h4v6h-4zM7 6h4v12H7zM7 14h18v4H7zM21 14h4v12h-4zM7 22h18v4H7zM7 20h4v6H7z" />
+</svg>
