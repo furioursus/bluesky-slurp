@@ -52,6 +52,8 @@
   --blur: 1.125rem;
   --disabled: 0.45;
   --toggle-w: 3.5rem;
+  --z-popover: 5;
+  --z-toggle: 10;
   --toggle-h: 4.75rem;
   --mono-scale: 0.85em;
   --panel: 75vh;
@@ -153,6 +155,8 @@ main:focus { outline: none; }
 .btn[disabled] { opacity: var(--disabled); cursor: not-allowed; }
 .btn-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
 
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
 .field { display: block; }
 .field .kicker { display: block; margin-bottom: var(--space-xs); }
 .input {
@@ -211,7 +215,7 @@ table.data .wide { width: var(--col-wide); }
 .corner-toggle {
   position: fixed;
   bottom: 0;
-  z-index: 10;
+  z-index: var(--z-toggle);
   width: var(--toggle-w);
   height: var(--toggle-h);
   display: grid;

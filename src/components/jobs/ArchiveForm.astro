@@ -2,6 +2,7 @@
 import Cell from '../ui/Cell.astro';
 import Check from '../ui/Check.astro';
 import Grid from '../ui/Grid.astro';
+import HandleInput from './HandleInput.astro';
 import JobRunner from './JobRunner.astro';
 ---
 
@@ -13,10 +14,7 @@ import JobRunner from './JobRunner.astro';
         <p class="muted">Every public record from every app on the atmosphere: posts, likes, reposts, follows, blocks, lists, and third-party apps too. Each interaction links straight to its source.</p>
       </Cell>
       <Cell stack="lg">
-        <label class="field">
-          <span class="kicker">Handle, DID, or bsky.app profile URL</span>
-          <input class="input" name="input" placeholder="handle.bsky.social" autocomplete="off" autocapitalize="off" spellcheck="false" required autofocus aria-label="Handle, DID, or profile URL" />
-        </label>
+        <HandleInput />
         <div class="split">
           <Check name="media" title="Media" note="Download images and video. Can be gigabytes." />
           <Check name="analyze" title="Analyze" note="Behavior and interests report. Free, offline." checked />

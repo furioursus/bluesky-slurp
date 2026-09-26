@@ -1,0 +1,192 @@
+<handle-typeahead class="typeahead">
+  <label class="field">
+    <span class="kicker">Handle, DID, or bsky.app profile URL</span>
+    <input
+      class="input"
+      name="input"
+      placeholder="handle.bsky.social"
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck="false"
+      required
+      autofocus
+      aria-label="Handle, DID, or profile URL"
+      role="combobox"
+      aria-autocomplete="list"
+      aria-expanded="false"
+      aria-controls="handle-options"
+    />
+  </label>
+  <ul id="handle-options" class="options" role="listbox" aria-label="Matching accounts" hidden></ul>
+  <p class="sr-only" aria-live="polite" data-status></p>
+</handle-typeahead>
+
+<script>
+  import { blurOn } from '../../lib/blur.ts';
+
+  const DEBOUNCE = 150;
+
+  type Actor = { handle: string; displayName: string | null; avatar: string | null; sensitive: boolean; archived: boolean };
+
+  const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string) => {
+    const node = document.createElement(tag);
+    node.className = className;
+    if (text) node.textContent = text;
+    return node;
+  };
+
+  // see docs/web-ui.md#handle-autocomplete
+  class HandleTypeahead extends HTMLElement {
+    input!: HTMLInputElement;
+    list!: HTMLUListElement;
+    status!: HTMLElement;
+    actors: Actor[] = [];
+    active = -1;
+    timer?: number;
+    request?: AbortController;
+
+    connectedCallback() {
+      this.input = this.querySelector('input')!;
+      this.list = this.querySelector('[role=listbox]')!;
+      this.status = this.querySelector('[data-status]')!;
+      this.input.addEventListener('input', () => {
+        clearTimeout(this.timer);
+        this.timer = window.setTimeout(() => this.lookup(), DEBOUNCE);
+      });
+      this.input.addEventListener('keydown', (e) => this.key(e));
+      this.input.addEventListener('blur', () => this.close());
+      this.list.addEventListener('pointerdown', (e) => {
+        const option = (e.target as Element).closest<HTMLElement>('[role=option]');
+        if (!option) return;
+        e.preventDefault();
+        this.pick(Number(option.dataset.index));
+      });
+    }
+
+    disconnectedCallback() {
+      clearTimeout(this.timer);
+      this.request?.abort();
+    }
+
+    async lookup() {
+      const q = this.input.value.trim();
+      this.request?.abort();
+      if (!q) return this.close();
+      this.request = new AbortController();
+      try {
+        const res = await fetch(`/api/typeahead?q=${encodeURIComponent(q)}`, { signal: this.request.signal });
+        const { actors } = await res.json();
+        if (this.input.value.trim() === q) this.show(actors);
+      } catch {}
+    }
+
+    show(actors: Actor[]) {
+      this.actors = actors;
+      this.list.replaceChildren(...actors.map((a, i) => this.option(a, i)));
+      this.status.textContent = actors.length ? `${actors.length} suggestions` : '';
+      this.toggle(actors.length > 0 && document.activeElement === this.input);
+    }
+
+    option(a: Actor, i: number) {
+      const li = el('li', 'option');
+      li.id = `handle-option-${i}`;
+      li.dataset.index = String(i);
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', 'false');
+      const pic = el('span', 'pic');
+      if (a.avatar && !(a.sensitive && blurOn())) {
+        const img = el('img', '');
+        img.src = a.avatar;
+        img.alt = '';
+        img.loading = 'lazy';
+        pic.append(img);
+      }
+      const text = el('span', 'who');
+      text.append(el('strong', '', a.displayName || a.handle), el('small', '', `@${a.handle}`));
+      li.append(pic, text);
+      if (a.archived) li.append(el('span', 'tag', 'archived'));
+      return li;
+    }
+
+    key(e: KeyboardEvent) {
+      const open = !this.list.hidden;
+      const n = this.actors.length;
+      if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && open) {
+        e.preventDefault();
+        const down = e.key === 'ArrowDown';
+        this.move(this.active < 0 ? (down ? 0 : n - 1) : (this.active + (down ? 1 : n - 1)) % n);
+      } else if (e.key === 'Enter' && open && this.active >= 0) {
+        e.preventDefault();
+        this.pick(this.active);
+      } else if (e.key === 'Escape' && open) {
+        e.preventDefault();
+        this.close();
+      }
+    }
+
+    move(i: number) {
+      this.active = i;
+      for (const option of this.list.children) option.setAttribute('aria-selected', String(option.id === `handle-option-${i}`));
+      this.input.setAttribute('aria-activedescendant', `handle-option-${i}`);
+      this.list.children[i]?.scrollIntoView({ block: 'nearest' });
+    }
+
+    pick(i: number) {
+      const actor = this.actors[i];
+      if (!actor) return;
+      this.input.value = actor.handle;
+      this.close();
+    }
+
+    toggle(open: boolean) {
+      this.list.hidden = !open;
+      this.input.setAttribute('aria-expanded', String(open));
+      this.active = -1;
+      this.input.removeAttribute('aria-activedescendant');
+    }
+
+    close() {
+      this.request?.abort();
+      clearTimeout(this.timer);
+      this.toggle(false);
+    }
+  }
+  customElements.define('handle-typeahead', HandleTypeahead);
+</script>
+
+<style>
+  .typeahead { position: relative; display: block; }
+  .options {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: var(--z-popover);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    max-height: var(--scroll-box);
+    overflow-y: auto;
+    background: var(--paper);
+    border: var(--line) solid var(--ink);
+    border-top: 0;
+  }
+  .options :global(.option) {
+    display: grid;
+    grid-template-columns: var(--avatar-sm) minmax(0, 1fr) auto;
+    gap: var(--space-sm);
+    align-items: center;
+    padding: var(--space-xs) var(--space-sm);
+    cursor: pointer;
+  }
+  .options :global(.option + .option) { border-top: var(--line) solid var(--ink); }
+  .options :global(.option:hover), .options :global(.option[aria-selected='true']) { background: var(--ink); color: var(--paper); }
+  .options :global(.pic) { width: var(--avatar-sm); height: var(--avatar-sm); border: var(--line) solid currentColor; background: var(--faint); overflow: hidden; }
+  .options :global(.pic img) { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .options :global(.who) { display: grid; min-width: 0; }
+  .options :global(.who strong), .options :global(.who small) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .options :global(.who strong) { font-weight: 400; }
+  .options :global(.who small) { color: var(--muted); font-size: var(--text-sm); }
+  .options :global(.option:hover small), .options :global(.option[aria-selected='true'] small) { color: inherit; }
+  .options :global(.tag) { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: var(--track); border: var(--line) solid currentColor; padding: var(--space-3xs) var(--space-xs); }
+</style>

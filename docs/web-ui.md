@@ -1,6 +1,6 @@
 # Web UI
 
-**TL;DR:** an Astro 7 app rendered on the server by the Node adapter (`npm run dev`, `npm run serve`). Pages read archives straight from disk and arrive fully rendered. Astro's `ClientRouter` swaps pages in place, so navigation feels like an SPA with no reloads, while every page is still server-rendered HTML. The browser runs a little JavaScript for the router, the job panel, the theme and blur toggles, the thread-roots toggle, scroll keeping and click-to-reveal on sensitive media. It's local-only on purpose, and it never renders archived text as HTML.
+**TL;DR:** an Astro 7 app rendered on the server by the Node adapter (`npm run dev`, `npm run serve`). Pages read archives straight from disk and arrive fully rendered. Astro's `ClientRouter` swaps pages in place, so navigation feels like an SPA with no reloads, while every page is still server-rendered HTML. The browser runs a little JavaScript for the router, the job panel, handle autocomplete, the theme and blur toggles, the thread-roots toggle, scroll keeping and click-to-reveal on sensitive media. It's local-only on purpose, and it never renders archived text as HTML.
 
 ## Structure
 
@@ -13,13 +13,13 @@ src/
   layouts/        Base (html shell, ClientRouter, masthead, theme and blur toggles, scroll keeper) · AccountLayout (header + tabs, 404 when not archived)
   components/
     ui/           Grid · Cell · Section · Stat · Tabs · Check · Ext · People · Chips · EmptyState
-    jobs/         JobRunner (the only real island) · ArchiveForm · AnalysisActions · NoReport · UpgradeReport
+    jobs/         JobRunner (the only real island) · ArchiveForm · HandleInput · AnalysisActions · NoReport · UpgradeReport
     report/       HeadlineStats · ShapeSection · HoursChart · TargetingSection · InterestsSection
     records/      CollectionList · Pager · RootsToggle · RecordCard · RefList · PostEmbed · EmbedMedia · MediaThumbs
     media/        MediaWall · MediaFilters · MediaDownload · MediaViewer
     account/      AccountHeader · AccountGrid
   pages/          / · /accounts · /about · /a/[handle] · /a/[handle]/[snapshot]/{report,records/[...collection],media,media/[cid],identity}
-                  /blobs/[handle]/[file] · /thumbs/[handle]/[file] · /api/jobs · /api/jobs/[id]/events
+                  /blobs/[handle]/[file] · /thumbs/[handle]/[file] · /api/jobs · /api/jobs/[id]/events · /api/typeahead
   styles/         global.css (tokens + primitives) · media.css (the one breakpoint)
 ```
 
@@ -64,6 +64,17 @@ src/
 - Pointer labels resolve DIDs to `@handles` server-side too (`getHandles`, same cache).
 - Images on posts or authors labelled `porn`, `sexual`, `nudity`, `graphic-media` or `gore` are blurred until clicked, unless blur is off. See [Sensitive media](#sensitive-media).
 - Media not on disk loads from the account's PDS (the user's choice).
+
+## Handle autocomplete
+
+**TL;DR:** the handle box on the home page suggests up to 8 accounts as you type: up to 3 already-archived accounts first (tagged "archived"), then Bluesky's public typeahead. Pick with the mouse or ↑/↓ + Enter. Picking fills the box and doesn't submit.
+
+- **Route:** `GET /api/typeahead?q=` (`src/pages/api/typeahead.ts`). Local matches come from `listAccounts` (handle or display name contains the query, prefix matches first). Remote matches come from `app.bsky.actor.searchActorsTypeahead` on the public AppView via `searchActors` in `src/lib/appview.ts`, 5 s timeout, cached per query for 10 minutes. Duplicates are dropped by DID. `offline: true` means the AppView couldn't be reached and only local matches came back.
+- **What leaves the machine:** the typed text, debounced 150 ms, goes from this server to `public.api.bsky.app`. The browser only talks to this server, but avatars load from Bluesky's CDN, the same as embeds do.
+- **Skipped queries:** empty text, anything starting `did:`, and anything with a `/` (profile URLs) never trigger a lookup, because the archiver resolves those itself. A leading `@` is stripped and queries are capped at 64 characters.
+- **Untrusted text:** display names and handles are set with `textContent` and avatars must be `https://`, in keeping with [Rendering untrusted text](#rendering-untrusted-text).
+- **Sensitive avatars:** an account self-labelled with a [sensitive](#sensitive-media) label shows an empty avatar box while blur is on.
+- **Accessibility:** ARIA 1.2 combobox. The input has `role="combobox"`, `aria-expanded` and `aria-activedescendant`, the list is a `listbox` of `option`s, a polite live region announces the suggestion count, and Escape or leaving the field closes the list. Stale responses are dropped, so a slow reply can't overwrite newer suggestions.
 
 ## Design
 

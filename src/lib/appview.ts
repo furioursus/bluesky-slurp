@@ -61,3 +61,36 @@ export const getHandles = (dids: string[]) =>
     (b) => `${APPVIEW}/app.bsky.actor.getProfiles?${b.map((d) => `actors=${encodeURIComponent(d)}`).join('&')}`,
     (body) => (body.profiles ?? []).map((p: any) => [p.did, p.handle]),
   );
+
+export interface ActorHit {
+  did: string;
+  handle: string;
+  displayName: string | null;
+  avatar: string | null;
+  labels: string[];
+}
+
+const TYPEAHEAD_LIMIT = 8;
+const typeahead = new Map<string, { at: number; value: ActorHit[] }>();
+
+// see docs/web-ui.md#handle-autocomplete
+export async function searchActors(q: string): Promise<ActorHit[] | undefined> {
+  const key = q.toLowerCase();
+  const hit = typeahead.get(key);
+  if (hit && Date.now() - hit.at < TTL) return hit.value;
+  try {
+    const res = await fetch(`${APPVIEW}/app.bsky.actor.searchActorsTypeahead?q=${encodeURIComponent(q)}&limit=${TYPEAHEAD_LIMIT}`, { signal: AbortSignal.timeout(TIMEOUT) });
+    if (!res.ok) throw new Error(String(res.status));
+    const value: ActorHit[] = ((await res.json()).actors ?? []).map((a: any) => ({
+      did: a.did,
+      handle: a.handle,
+      displayName: a.displayName || null,
+      avatar: a.avatar ?? null,
+      labels: (a.labels ?? []).map((l: any) => l.val),
+    }));
+    typeahead.set(key, { at: Date.now(), value });
+    return value;
+  } catch {
+    return undefined;
+  }
+}
