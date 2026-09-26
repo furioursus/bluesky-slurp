@@ -196,13 +196,12 @@ table.data .wide { width: var(--col-wide); }
 .chip { border: var(--line) solid var(--ink); padding: var(--space-2xs) var(--space-sm); font-size: var(--text-sm); }
 .chip b { font-weight: 600; margin-left: var(--space-xs); font-variant-numeric: tabular-nums; }
 
-.avatar { width: var(--avatar); height: var(--avatar); object-fit: cover; filter: grayscale(1) contrast(1.1); border: var(--line) solid var(--ink); background: var(--faint); display: block; }
+.avatar { width: var(--avatar); height: var(--avatar); object-fit: cover; border: var(--line) solid var(--ink); background: var(--faint); display: block; }
 .avatar.sm { width: var(--avatar-sm); height: var(--avatar-sm); }
 .avatar.lg { width: 100%; height: auto; aspect-ratio: 1; border: 0; }
 
 .thumbs { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-sm); }
-.thumbs img, .thumbs video { height: var(--thumb); min-width: var(--thumb-min); max-width: 100%; object-fit: cover; filter: grayscale(1); border: var(--line) solid var(--ink); background: var(--faint); }
-.thumbs img:hover, .thumbs video:hover { filter: none; }
+.thumbs img, .thumbs video { height: var(--thumb); min-width: var(--thumb-min); max-width: 100%; object-fit: cover; border: var(--line) solid var(--ink); background: var(--faint); }
 
 /* see docs/web-ui.md#sensitive-media */
 :where(:root:not([data-blur='off'])) .blurred { position: relative; overflow: hidden; display: inline-block; cursor: pointer; }

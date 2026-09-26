@@ -75,7 +75,7 @@ const mediaKind = media?.$type?.split('.').at(-1)?.replace('#view', '');
   .text { margin-top: var(--space-xs); white-space: pre-wrap; overflow-wrap: anywhere; }
   :global(a.link-card-link) { text-decoration: none; display: block; }
   .link-card { display: grid; grid-template-columns: var(--thumb-min) minmax(0, 1fr); gap: var(--space-sm); border: var(--line) solid var(--ink); margin-top: var(--space-sm); padding: var(--space-sm); font-size: var(--text-sm); }
-  .link-card img { width: var(--thumb-min); aspect-ratio: 4 / 3; object-fit: cover; filter: grayscale(1); }
+  .link-card img { width: var(--thumb-min); aspect-ratio: 4 / 3; object-fit: cover; }
   .video-thumb { position: relative; display: inline-block; }
   .video-thumb b { position: absolute; left: var(--space-xs); bottom: var(--space-xs); background: var(--ink); color: var(--paper); padding: var(--space-3xs) var(--space-xs); font-weight: 400; font-size: var(--text-xs); }
 </style>

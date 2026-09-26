@@ -67,7 +67,7 @@ src/
 
 ## Design
 
-**TL;DR:** a brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, Titillium Web, uppercase headings, no radius or shadow, light and dark themes. Tokens are global, and every component owns its own CSS.
+**TL;DR:** a brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, Titillium Web, uppercase headings, no radius or shadow, light and dark themes. Media and avatars show in full colour (the reference's grayscale-until-hover was dropped on 2026-09-25); only the sensitive-media blur stays grey. Tokens are global, and every component owns its own CSS.
 
 - **Tokens:** every length, size, type step, tracking and leading value is a custom property on `:root` in `src/styles/global.css`. Rules use `var(--…)` or a `calc()` of tokens. Inline `style` is reserved for data-driven widths and heights (chart bars).
 - **One page breakpoint:** `@custom-media --narrow` in `src/styles/media.css`, injected into every stylesheet by `@csstools/postcss-global-data` + `postcss-custom-media` (see `postcss.config.mjs`). Components write `@media (--narrow)`, and `860px` appears exactly once. The masthead is the exception: it responds to its own width with a container query (see [Masthead](#masthead)).
@@ -114,7 +114,7 @@ src/
 - **Click to reveal:** with blur on, clicking a blurred item removes its blur instead of following the link (`SensitiveReveal`). With blur off, clicks go straight through.
 - **How it's switched:** `BlurToggle` sets `data-blur="off"` on `<html>` and saves `slurp-blur` in `localStorage`. The blur rules only match `:root:not([data-blur='off'])`, so switching needs no server round trip or navigation and never moves the scroll. The global rules are wrapped in `:where()` so they keep the low specificity that lets components like `.tile` override `display` and `min-width`.
 - **Before paint and across swaps:** the same inline script that applies the theme applies `data-blur` before first paint, and `BlurToggle` copies it onto the incoming document in `astro:before-swap`, just like the theme. The server never sees the setting.
-- **In practice:** on one archive, 48% of files were self-labelled, and every tile is grayscale until hovered, so with blur on about half the wall reads as flat grey squares with a "Sensitive · click to show" tag.
+- **In practice:** on one archive, 48% of files were self-labelled, so with blur on about half the wall reads as grey smudges with a "Sensitive · click to show" tag.
 
 ## Source links
 
