@@ -2,9 +2,11 @@
 import { ClientRouter } from 'astro:transitions';
 import '../styles/global.css';
 import BlurToggle from '../components/BlurToggle.astro';
+import FontPicker from '../components/FontPicker.astro';
 import Masthead from '../components/Masthead.astro';
 import ScrollKeeper from '../components/ScrollKeeper.astro';
 import ThemeToggle from '../components/ThemeToggle.astro';
+import { FONT_KEY, FONT_STACKS, WORDMARK } from '../lib/fonts.ts';
 
 interface Props {
   title?: string;
@@ -21,11 +23,21 @@ const { title, nav } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title ? `${title} · Slurp` : 'Slurp'}</title>
     <meta name="description" content="Archive and read an atproto account's public activity." />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600&display=swap" />
-    <script is:inline>
-      try { const t = localStorage.getItem('slurp-theme'); if (t) document.documentElement.dataset.theme = t; if (localStorage.getItem('slurp-blur') === 'off') document.documentElement.dataset.blur = 'off'; } catch {}
+    <script is:inline define:vars={{ fonts: FONT_STACKS, fontKey: FONT_KEY, wordmark: WORDMARK }}>
+      const root = document.documentElement;
+      let font = null;
+      try {
+        const t = localStorage.getItem('slurp-theme');
+        if (t) root.dataset.theme = t;
+        if (localStorage.getItem('slurp-blur') === 'off') root.dataset.blur = 'off';
+        font = localStorage.getItem(fontKey);
+      } catch {}
+      const f = fonts.find((x) => x.key === font) ?? fonts[0];
+      const ctx = document.createElement('canvas').getContext('2d');
+      ctx.font = `400 100px ${f.stack}`;
+      root.dataset.font = f.key;
+      root.style.setProperty('--font', f.stack);
+      root.style.setProperty('--wordmark-glyphs', String(ctx.measureText(wordmark).width / 100));
     </script>
     <ClientRouter />
   </head>
@@ -34,6 +46,7 @@ const { title, nav } = Astro.props;
     <main id="view"><slot /></main>
     <ThemeToggle />
     <BlurToggle />
+    <FontPicker />
     <ScrollKeeper />
   </body>
 </html>

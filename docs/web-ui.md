@@ -1,6 +1,6 @@
 # Web UI
 
-**TL;DR:** an Astro 7 app rendered on the server by the Node adapter (`npm run dev`, `npm run serve`). Pages read archives straight from disk and arrive fully rendered. Astro's `ClientRouter` swaps pages in place, so navigation feels like an SPA with no reloads, while every page is still server-rendered HTML. The browser runs a little JavaScript for the router, the job panel, handle autocomplete, the theme and blur toggles, the thread-roots toggle, scroll keeping and click-to-reveal on sensitive media. It's local-only on purpose, and it never renders archived text as HTML.
+**TL;DR:** an Astro 7 app rendered on the server by the Node adapter (`npm run dev`, `npm run serve`). Pages read archives straight from disk and arrive fully rendered. Astro's `ClientRouter` swaps pages in place, so navigation feels like an SPA with no reloads, while every page is still server-rendered HTML. The browser runs a little JavaScript for the router, the job panel, handle autocomplete, the theme, blur and font controls, the thread-roots toggle, scroll keeping and click-to-reveal on sensitive media. It's local-only on purpose, and it never renders archived text as HTML.
 
 ## Structure
 
@@ -8,9 +8,9 @@
 
 ```
 src/
-  lib/            engine (archive, analyze, refs, identity, http, media, cli) + UI helpers (archives, jobs, appview, format, ui, scroll, media-view, serve, thumbs, blur)
+  lib/            engine (archive, analyze, refs, identity, http, media, cli) + UI helpers (archives, jobs, appview, format, ui, scroll, media-view, serve, thumbs, blur, fonts)
   middleware.ts   same-origin check for non-GET requests
-  layouts/        Base (html shell, ClientRouter, masthead, theme and blur toggles, scroll keeper) · AccountLayout (header + tabs, 404 when not archived)
+  layouts/        Base (html shell, ClientRouter, masthead, theme/blur/font controls, scroll keeper) · AccountLayout (header + tabs, 404 when not archived)
   components/
     ui/           Grid · Cell · Section · Stat · Tabs · Check · Ext · People · Chips · EmptyState
     jobs/         JobRunner (the only real island) · ArchiveForm · HandleInput · AnalysisActions · NoReport · UpgradeReport
@@ -65,6 +65,18 @@ src/
 - Images on posts or authors labelled `porn`, `sexual`, `nudity`, `graphic-media` or `gore` are blurred until clicked, unless blur is off. See [Sensitive media](#sensitive-media).
 - Media not on disk loads from the account's PDS (the user's choice).
 
+## Fonts
+
+**TL;DR:** no web fonts. Text uses a [Modern Font Stacks](https://github.com/system-fonts/modern-font-stacks) stack, Neo-Grotesque by default (Inter, Roboto, Helvetica Neue, Arial…). The **font** control next to day/night and blur switches the whole page between all 15 stacks, remembered per browser. Code and IDs always use the Monospace Code stack (`--mono`).
+
+- **Catalogue:** `FONT_STACKS` in `src/lib/fonts.ts`, copied verbatim from the Modern Font Stacks README. The first entry is the default. The Neo-Grotesque stack is also the `--font` default in `global.css`, for pages rendered with JavaScript off. Keep the two identical.
+- **What you get depends on the device:** each stack names system fonts and falls back through them, so Industrial is Bahnschrift on Windows but DIN Alternate on macOS. DIN Alternate only ships in bold, so on a Mac that stack renders every weight bold. Several stacks lack the 300 weight the headings and inputs use, and the browser picks the nearest.
+- **Picker:** a native `popover` above the corner, holding a radio group with each name shown in its own stack. Arrow keys switch fonts live, Escape or clicking outside closes it, and it opens focused on the current font. Its bottom edge sits on the toggles' top border, so there's one line, not two.
+- **Before paint:** the inline script in `Base.astro` reads `slurp-font`, sets `--font` and `data-font` on `<html>`, and sizes the wordmark (next bullet). It gets the catalogue via `define:vars`, which `astro check` can't see, hence its two "could not find name 'fonts'" hints. It duplicates `applyFont` in `fonts.ts` because inline scripts can't import, so keep them in step. An unknown saved key falls back to the default.
+- **Wordmark:** "SLURP" is sized from its glyph width (see [Masthead](#masthead)), which differs per font, so both the inline script and `applyFont` measure it with canvas `measureText` at 100px and set `--wordmark-glyphs`. System fonts need no loading, so the measurement is right the first time. Checked with Neo-Grotesque, Industrial, Didone, Monospace Code and Handwritten: the ink width matched the cell's content width (523px) every time, with no horizontal overflow.
+- **Across swaps:** `FontPicker` copies `data-font`, `--font` and `--wordmark-glyphs` onto the incoming document in `astro:before-swap`, like the theme and blur. The picker itself is `transition:persist`.
+- **Privacy:** removing Google Fonts means pages make no third-party request for type.
+
 ## Handle autocomplete
 
 **TL;DR:** the handle box on the home page suggests up to 8 accounts as you type: up to 3 already-archived accounts first (tagged "archived"), then Bluesky's public typeahead. Pick with the mouse or ↑/↓ + Enter. Picking fills the box and doesn't submit.
@@ -78,14 +90,14 @@ src/
 
 ## Design
 
-**TL;DR:** a brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, Titillium Web, uppercase headings, no radius or shadow, light and dark themes. Media and avatars show in full colour (the reference's grayscale-until-hover was dropped on 2026-09-25); only the sensitive-media blur stays grey. Tokens are global, and every component owns its own CSS.
+**TL;DR:** a brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, system font stacks (see [Fonts](#fonts)), uppercase headings, no radius or shadow, light and dark themes. Media and avatars show in full colour (the reference's grayscale-until-hover was dropped on 2026-09-25); only the sensitive-media blur stays grey. Tokens are global, and every component owns its own CSS.
 
-- **Tokens:** every length, size, type step, tracking and leading value is a custom property on `:root` in `src/styles/global.css`. Rules use `var(--…)` or a `calc()` of tokens. Inline `style` is reserved for data-driven widths and heights (chart bars).
+- **Tokens:** every length, size, type step, tracking and leading value is a custom property on `:root` in `src/styles/global.css`. Rules use `var(--…)` or a `calc()` of tokens. Inline `style` is reserved for data-driven values: chart bar widths and heights, and the font picker's per-option sample and the `--font` / `--wordmark-glyphs` it sets on `<html>`.
 - **One page breakpoint:** `@custom-media --narrow` in `src/styles/media.css` (which also holds `--hover-motion`, see [Hover previews](#hover-previews)), injected into every stylesheet by `@csstools/postcss-global-data` + `postcss-custom-media` (see `postcss.config.mjs`). Components write `@media (--narrow)`, and `860px` appears exactly once. The masthead is the exception: it responds to its own width with a container query (see [Masthead](#masthead)).
 - **Scales:** spacing `--space-3xs` to `--space-xl` (2px to 32px), type `--text-2xs` to `--text-lg` plus four fluid display sizes, tracking `--track` / `--track-wide`, and `--control` (2.75rem) as the minimum tap target.
 - **Scoped styles:** a component's `<style>` is scoped to its own template. `Grid` and `Cell` spread their props onto their root element, so a parent's scope attribute reaches them and `class` passed from a parent stays styleable. Use `:global()` only for classes applied through `Ext` (`blurred`, `link-card-link`).
 - **One line, never two:** a grid nested inside a cell drops its own bottom border (`.cell .grid`), since the outer grid already draws that edge. Nested content that needs lines should be full-bleed cells in the same grid, not a grid floating inside padding. A 2-column grid with an odd number of cells stretches the last one across the row, so the ink background never shows through as a black block.
-- **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference, with the blur toggle beside it (same `.corner-toggle` box, sharing one line). `body` has bottom padding so the last row can always scroll clear of it, after it was found covering the Proceed button.
+- **Toggle clearance:** the day/night toggle is fixed bottom-left like the reference, with the blur toggle and font picker beside it (same `.corner-toggle` box, sharing one line). `body` has bottom padding so the last row can always scroll clear of it, after it was found covering the Proceed button.
 - **Theme before paint:** an inline script in `Base.astro` applies the saved theme before first paint so night mode doesn't flash white. On router swaps the router copies the new page's `<html>` attributes, which would drop `data-theme`, so `ThemeToggle` writes the current theme onto the incoming document in `astro:before-swap`. The toggle itself is `transition:persist`.
 - **Scroll:** see [Scroll](#scroll).
 - **Stale component modules in dev:** after editing an `.astro` file, Astro 7's dev server has twice served the old compiled `<style>` or `<script>` for that component (fetched with `cache: no-store`), while the file watcher reported the change and the markup updated. If an edit seems to do nothing, restart `npm run dev` before debugging the code. A production build never has this problem.
@@ -188,7 +200,7 @@ src/
 **TL;DR:** the masthead sizes itself from container queries, not the viewport. The `<header>` is a `masthead` container, so the grid inside collapses when the masthead itself is under `54rem`. The wordmark cell is its own `inline-size` container, and "SLURP" is set in `cqi` so its visible ink fills the cell's content width exactly, at any layout.
 
 - **Why a wrapper:** a container query can't style the container itself, only its descendants. `<header class="masthead">` is the container, and the grid (`.bar`) inside it is what changes columns.
-- **Wordmark fill:** `font-size = 100cqi / (glyphs + gaps × tracking)`. Measured in Titillium Web 400, "SLURP" is `2.8611em` of glyphs with 4 gaps of `0.55em` tracking between letters, so the visible text is `5.0611em` wide. The 5th tracking gap trails after the last letter as empty space and is clipped by `overflow: hidden`, which also keeps the page from scrolling sideways.
-- **Changing the text or font:** re-measure the glyph width (render the word at `100px` with `letter-spacing: 0` and divide its width by 100) and update `--wordmark-glyphs`. Update `--wordmark-gaps` if the letter count changes.
+- **Wordmark fill:** `font-size = 100cqi / (glyphs + gaps × tracking)`. `--wordmark-glyphs` is measured at runtime for whichever font is active (see [Fonts](#fonts)): about `3.259em` in Helvetica Neue, which is also the CSS fallback. The 4 gaps between letters are `0.55em` of tracking each. The 5th tracking gap trails after the last letter as empty space and is clipped by `overflow: hidden`, which also keeps the page from scrolling sideways.
+- **Changing the text:** update `WORDMARK` in `src/lib/fonts.ts` along with the markup, and `--wordmark-gaps` if the letter count changes. Fonts need nothing, since the width is measured live.
 - **The one literal:** `@container masthead (width < 54rem)`. Container conditions can't read custom properties, and `postcss-custom-media` only handles `@media`. The threshold is the masthead's own need (three columns stop fitting), not the page breakpoint, so it lives only in `Masthead.astro`.
 - **Measured fill:** the ink width equals the cell's content width at 375, 567, 860, 870, 1280 and 1920px, with no horizontal overflow at any of them.
