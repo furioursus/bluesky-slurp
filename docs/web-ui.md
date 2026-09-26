@@ -81,7 +81,7 @@ src/
 **TL;DR:** a brutalist grid modelled on brutalist.design's "Brutal" template: 1px ink hairlines made by `gap: 1px` over an ink background, Titillium Web, uppercase headings, no radius or shadow, light and dark themes. Media and avatars show in full colour (the reference's grayscale-until-hover was dropped on 2026-09-25); only the sensitive-media blur stays grey. Tokens are global, and every component owns its own CSS.
 
 - **Tokens:** every length, size, type step, tracking and leading value is a custom property on `:root` in `src/styles/global.css`. Rules use `var(--…)` or a `calc()` of tokens. Inline `style` is reserved for data-driven widths and heights (chart bars).
-- **One page breakpoint:** `@custom-media --narrow` in `src/styles/media.css`, injected into every stylesheet by `@csstools/postcss-global-data` + `postcss-custom-media` (see `postcss.config.mjs`). Components write `@media (--narrow)`, and `860px` appears exactly once. The masthead is the exception: it responds to its own width with a container query (see [Masthead](#masthead)).
+- **One page breakpoint:** `@custom-media --narrow` in `src/styles/media.css` (which also holds `--hover-motion`, see [Hover previews](#hover-previews)), injected into every stylesheet by `@csstools/postcss-global-data` + `postcss-custom-media` (see `postcss.config.mjs`). Components write `@media (--narrow)`, and `860px` appears exactly once. The masthead is the exception: it responds to its own width with a container query (see [Masthead](#masthead)).
 - **Scales:** spacing `--space-3xs` to `--space-xl` (2px to 32px), type `--text-2xs` to `--text-lg` plus four fluid display sizes, tracking `--track` / `--track-wide`, and `--control` (2.75rem) as the minimum tap target.
 - **Scoped styles:** a component's `<style>` is scoped to its own template. `Grid` and `Cell` spread their props onto their root element, so a parent's scope attribute reaches them and `class` passed from a parent stays styleable. Use `:global()` only for classes applied through `Ext` (`blurred`, `link-card-link`).
 - **One line, never two:** a grid nested inside a cell drops its own bottom border (`.cell .grid`), since the outer grid already draws that edge. Nested content that needs lines should be full-bleed cells in the same grid, not a grid floating inside padding. A 2-column grid with an odd number of cells stretches the last one across the row, so the ink background never shows through as a black block.
@@ -116,6 +116,18 @@ src/
 - **Caching headers:** blobs and thumbnails are named by CID, so both are served `private, max-age=31536000, immutable`.
 - **Records tab:** local images use the thumbnail and link to the original. Local videos keep their player, with the poster and `preload="none"`, so nothing downloads until you press play.
 - **Needs:** `sharp` (a direct dependency) and `ffmpeg` on `PATH` for video posters.
+
+## Hover previews
+
+**TL;DR:** on the media wall, hovering a tile zooms its thumbnail to 115% (`--zoom`, over `--zoom-time`), and hovering a video tile plays the video muted, looped and zoomed over its poster. Moving away stops it and frees the connection. Mouse and keyboard focus only.
+
+- **Only when it makes sense:** everything is gated on `(hover: hover) and (prefers-reduced-motion: no-preference)`: `--hover-motion` in `src/styles/media.css` for the CSS, and the same string as `HOVER_MOTION` in `MediaWall`'s script. Keep the two in step. Touch taps never start a preview, and reduced-motion users get neither zoom nor playback.
+- **Built on hover, never in the markup:** a `<video>` in every tile is what made the wall blank (see [Thumbnails](#thumbnails)). The preview `<video class="preview">` is created on `pointerover` or `:focus-visible` from the tile's `data-preview` URL and destroyed on leave with `pause()`, `removeAttribute('src')`, `load()`, so the browser drops the connection. Checked: after hovering 10 video tiles in a row, 0 previews were left over and 12 thumbnails fetched in 59 ms.
+- **No flash:** the preview stays at opacity 0 until its `playing` event, so the poster shows until real frames arrive. It's inserted before the ▶ badge so the badge stays on top.
+- **Always silent:** `muted`, no `controls`, `aria-hidden` (the tile link is what's announced).
+- **Blur wins:** a blurred tile never previews while blur is on. Click to reveal it, or switch blur off, and it previews like any other.
+- **Router swaps:** every preview is torn down on `astro:before-swap`.
+- **Scope:** the media wall only. Records-tab thumbnails and players are unchanged.
 
 ## Sensitive media
 

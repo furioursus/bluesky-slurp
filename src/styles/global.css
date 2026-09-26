@@ -50,6 +50,8 @@
   --cta: 8.75rem;
   --arrow: 0.375rem;
   --blur: 1.125rem;
+  --zoom: 1.15;
+  --zoom-time: 240ms;
   --disabled: 0.45;
   --toggle-w: 3.5rem;
   --z-popover: 5;

@@ -12,13 +12,14 @@ interface Props {
 
 const { handle, items, href } = Astro.props;
 const thumb = (i: MediaItem) => `/thumbs/${handle}/${i.file}`;
+const blob = (i: MediaItem) => `/blobs/${handle}/${i.file}`;
 ---
 
 <div class="wall">
   <div class="tiles">
     {
       items.map((i) => (
-        <a class:list={['tile', { blurred: isSensitive(i, SENSITIVE) }]} href={href(i)} title={[i.at?.slice(0, 10), i.uses[0]?.alt].filter(Boolean).join(' · ')}>
+        <a class:list={['tile', { blurred: isSensitive(i, SENSITIVE) }]} href={href(i)} data-preview={i.kind === 'video' ? blob(i) : undefined} title={[i.at?.slice(0, 10), i.uses[0]?.alt].filter(Boolean).join(' · ')}>
           {i.kind !== 'other' && <img src={thumb(i)} alt={i.uses.find((u) => u.alt)?.alt ?? ''} loading="lazy" decoding="async" />}
           {i.kind === 'other' && <span class="mime">{i.mimeType ?? 'file'}</span>}
           {i.kind === 'video' && <b class="badge">▶</b>}
@@ -32,6 +33,52 @@ const thumb = (i: MediaItem) => `/thumbs/${handle}/${i.file}`;
 
 <script>
   import { blurOn } from '../../lib/blur.ts';
+
+  // see docs/web-ui.md#hover-previews
+  const HOVER_MOTION = matchMedia('(hover: hover) and (prefers-reduced-motion: no-preference)');
+
+  const stop = (tile: Element) => {
+    const video = tile.querySelector<HTMLVideoElement>('video.preview');
+    if (!video) return;
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    video.remove();
+  };
+
+  const start = (tile: HTMLElement) => {
+    if (!HOVER_MOTION.matches || tile.querySelector('video.preview') || (tile.classList.contains('blurred') && blurOn())) return;
+    const video = document.createElement('video');
+    video.className = 'preview';
+    video.muted = true;
+    video.loop = true;
+    video.playsInline = true;
+    video.setAttribute('aria-hidden', 'true');
+    video.addEventListener('playing', () => video.classList.add('on'), { once: true });
+    video.src = tile.dataset.preview!;
+    tile.insertBefore(video, tile.querySelector('.badge'));
+    video.play().catch(() => {});
+  };
+
+  const previewTile = (e: Event) => (e.target as Element).closest?.<HTMLElement>('.tile[data-preview]');
+
+  document.addEventListener('pointerover', (e) => {
+    const tile = previewTile(e);
+    if (tile && e.pointerType === 'mouse') start(tile);
+  });
+  document.addEventListener('pointerout', (e) => {
+    const tile = previewTile(e);
+    if (tile && !tile.contains(e.relatedTarget as Node)) stop(tile);
+  });
+  document.addEventListener('focusin', (e) => {
+    const tile = previewTile(e);
+    if (tile?.matches(':focus-visible')) start(tile);
+  });
+  document.addEventListener('focusout', (e) => {
+    const tile = previewTile(e);
+    if (tile) stop(tile);
+  });
+  document.addEventListener('astro:before-swap', () => document.querySelectorAll('.tile[data-preview]').forEach(stop));
 
   document.addEventListener('click', (e) => {
     const tile = (e.target as HTMLElement).closest('.tile');
@@ -60,6 +107,12 @@ const thumb = (i: MediaItem) => `/thumbs/${handle}/${i.file}`;
     text-decoration: none;
   }
   .tile img { width: 100%; height: 100%; object-fit: cover; min-width: 0; }
+  .tiles :global(.preview) { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transform: scale(var(--zoom)); pointer-events: none; }
+  .tiles :global(.preview.on) { opacity: 1; }
+  @media (--hover-motion) {
+    .tile img { transition: transform var(--zoom-time) ease-out; }
+    .tile:hover img, .tile:focus-visible img { transform: scale(var(--zoom)); }
+  }
   :global(:root:not([data-blur='off'])) .tile.blurred img { filter: blur(var(--blur)) grayscale(1); }
   .badge { position: absolute; left: var(--space-xs); bottom: var(--space-xs); background: var(--ink); color: var(--paper); padding: var(--space-3xs) var(--space-xs); font-weight: 400; font-size: var(--text-xs); }
   .mime { font-family: var(--mono); font-size: var(--text-xs); color: var(--muted); padding: var(--space-sm); overflow-wrap: anywhere; text-align: center; }

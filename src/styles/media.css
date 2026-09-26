@@ -1,1 +1,2 @@
 @custom-media --narrow (max-width: 860px);
+@custom-media --hover-motion (hover: hover) and (prefers-reduced-motion: no-preference);
