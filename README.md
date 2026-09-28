@@ -43,7 +43,7 @@ Run `npm run dev`, then open http://127.0.0.1:4747. It's an Astro 7 app rendered
 | `npm run check` | `astro check`: types for `.astro` and `src/lib` |
 
 - **Local only:** it binds to `127.0.0.1` and rejects cross-origin POSTs, because it writes to disk and runs jobs. Don't put it on the open internet as-is.
-- **Screens:** New archive (form, then a live log), Accounts, and per account: Report / Records / Media / Identity. Pages are real URLs, e.g. `/a/<handle>/report?w=30d`. Each account page has an **Update** button, and Accounts has **Update all**. Navigation swaps pages in place (Astro `ClientRouter`).
+- **Screens:** New archive (form, then a live log, plus your 6 newest archives and a link to the rest), Accounts, and per account: Report / Records / Media / Identity. Pages are real URLs, e.g. `/a/<handle>/report?w=30d`. Each account page has an **Update** button, and Accounts has **Update all**. Navigation swaps pages in place (Astro `ClientRouter`).
 - **Archive location:** `SLURP_ARCHIVES=/path npm run dev` points the UI at another archive root (default `./archives`).
 
 ### Desktop app

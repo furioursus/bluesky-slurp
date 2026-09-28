@@ -4,12 +4,22 @@ import ArchiveForm from '../components/jobs/ArchiveForm.astro';
 import Section from '../components/ui/Section.astro';
 import Base from '../layouts/Base.astro';
 import { listAccounts } from '../lib/archives.ts';
+import { plural } from '../lib/format.ts';
 
 const RECENT = 6;
-const accounts = await listAccounts();
+const accounts = (await listAccounts()).sort((a, b) => b.firstArchivedAt.localeCompare(a.firstArchivedAt));
+const shown = accounts.slice(0, RECENT);
+const more = accounts.length - shown.length;
 ---
 
 <Base nav="home">
   <ArchiveForm />
-  {accounts.length > 0 && <Section title="On disk"><AccountGrid accounts={accounts.slice(0, RECENT)} /></Section>}
+  {
+    accounts.length > 0 && (
+      <Section title="On disk" sub={more ? `Newest ${shown.length} of ${accounts.length}` : plural(accounts.length, 'account')}>
+        {more > 0 && <p slot="aside"><a class="btn" href="/accounts">All {accounts.length} accounts →</a></p>}
+        <AccountGrid accounts={shown} />
+      </Section>
+    )
+  }
 </Base>
