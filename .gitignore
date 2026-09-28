@@ -5,3 +5,4 @@ archives/
 dist/
 .astro/
 release/
+.DS_Store
